@@ -18,6 +18,9 @@ A Flutter iOS app for importing and browsing TCG collection data (CSV/JSON).
 
 Requires: [Flutter SDK](https://docs.flutter.dev/get-started/install)
 
+Requires: [Xcode](https://developer.apple.com/support/xcode/) matching your macOS version -- check that page's compatibility table, then download the right one from [developer.apple.com/download/all](https://developer.apple.com/download/all/) (Apple ID sign-in required)
+
+    brew install --cask flutter
     flutter create --org com.dennislwm --project-name holovault .
     make setup
 

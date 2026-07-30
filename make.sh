@@ -5,7 +5,10 @@ function check_flutter {
 
 function check_xcode {
   command -v xcodebuild > /dev/null 2>&1 || { echo "[ERROR][check_xcode]: xcodebuild not found -- install Xcode for iOS builds"; return 1; }
-  echo "[OK]   xcodebuild found ($(xcodebuild -version 2>&1 | head -1))"
+  local version_output
+  version_output=$(xcodebuild -version 2>&1)
+  [ $? -eq 0 ] || { echo "[ERROR][check_xcode]: xcodebuild present but not usable -- $(echo "$version_output" | head -1)"; return 1; }
+  echo "[OK]   xcodebuild found ($(echo "$version_output" | head -1))"
 }
 
 function check_pins {
