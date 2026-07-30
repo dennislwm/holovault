@@ -1,0 +1,8 @@
+.dart_tool/
+.packages
+build/
+*.iml
+.DS_Store
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.podspec
