@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/database/database.dart';
 import 'package:holovault/main.dart';
+import 'package:holovault/screens/collection_list_screen.dart';
 
 // ponytail: drift's StreamBuilder-backed watch() query schedules a
 // zero-duration cleanup Timer on unmount (StreamQueryStore.markAsClosed).
@@ -69,6 +70,45 @@ void main() {
 
     final rows = await db.select(db.collectionItems).get();
     expect(rows.single.name, 'Blastoise');
+
+    await disposeAndFlush(tester);
+  });
+
+  testWidgets('import button shows the picked file path', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CollectionListScreen(
+          database: db,
+          pickFile: () async => '/fake/path/export.csv',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.file_upload));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selected: /fake/path/export.csv'), findsOneWidget);
+
+    await disposeAndFlush(tester);
+  });
+
+  testWidgets('import button shows cancelled when the picker returns null', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CollectionListScreen(database: db, pickFile: () async => null),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.file_upload));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Import cancelled'), findsOneWidget);
 
     await disposeAndFlush(tester);
   });

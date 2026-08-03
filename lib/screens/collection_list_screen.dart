@@ -1,19 +1,53 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../database/database.dart';
 import 'item_detail_screen.dart';
 
+/// ADR-06, Option A: acquires a file path via the native document picker.
+/// Scope note (ADR-06): acquisition only -- parsing the picked file into
+/// rows is separate, undecided work.
+Future<String?> pickImportFile() async {
+  final result = await FilePicker.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['csv', 'json'],
+  );
+  return result?.files.single.path;
+}
+
 /// ADR-04, mechanism A1: a mobile-width list of collection items, reactive
 /// to the underlying drift table via [AppDatabase.watchAllItems].
 class CollectionListScreen extends StatelessWidget {
-  const CollectionListScreen({super.key, required this.database});
+  const CollectionListScreen({
+    super.key,
+    required this.database,
+    this.pickFile = pickImportFile,
+  });
 
   final AppDatabase database;
+  final Future<String?> Function() pickFile;
+
+  Future<void> _handleImport(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final path = await pickFile();
+    messenger.showSnackBar(
+      SnackBar(content: Text(path == null ? 'Import cancelled' : 'Selected: $path')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Collection')),
+      appBar: AppBar(
+        title: const Text('Collection'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload),
+            tooltip: 'Import',
+            onPressed: () => _handleImport(context),
+          ),
+        ],
+      ),
       body: StreamBuilder<List<CollectionItem>>(
         stream: database.watchAllItems(),
         builder: (context, snapshot) {
