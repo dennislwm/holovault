@@ -48,6 +48,11 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Reactive query for ADR-04's list screen -- emits a new list whenever
+  /// the underlying table changes, so the UI stays live during import/edit.
+  Stream<List<CollectionItem>> watchAllItems() =>
+      select(collectionItems).watch();
+
   static QueryExecutor _openConnection() {
     return driftDatabase(
       name: 'holovault',

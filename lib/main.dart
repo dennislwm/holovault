@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 
+import 'database/database.dart';
+import 'screens/collection_list_screen.dart';
+
 void main() {
-  runApp(const HolovaultApp());
+  runApp(HolovaultApp());
 }
 
 class HolovaultApp extends StatelessWidget {
-  const HolovaultApp({super.key});
+  HolovaultApp({super.key, AppDatabase? database})
+      : database = database ?? AppDatabase();
+
+  final AppDatabase database;
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       title: 'holovault',
-      home: Scaffold(
-        body: Center(child: Text('holovault')),
-      ),
+      home: CollectionListScreen(database: database),
     );
   }
 }
