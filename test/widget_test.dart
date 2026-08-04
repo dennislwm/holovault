@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,6 +105,35 @@ void main() {
 
     await disposeAndFlush(tester);
   });
+
+  testWidgets(
+    'saving the detail form does not wipe the item\'s other imported fields',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          valueTotal: const Value(10765.74),
+          rarity: const Value('Sealed'),
+        ),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Charizard'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'Blastoise');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final row = (await db.select(db.collectionItems).get()).single;
+      expect(row.name, 'Blastoise');
+      expect(row.valueTotal, 10765.74);
+      expect(row.rarity, 'Sealed');
+
+      await disposeAndFlush(tester);
+    },
+  );
 
   testWidgets(
     'import coerces typed fields and converts the CSV null literal to real null',
