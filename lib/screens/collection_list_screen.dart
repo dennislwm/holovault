@@ -118,9 +118,13 @@ class CollectionListScreen extends StatelessWidget {
       return;
     }
     final rows = await parseFile(path);
-    for (final row in rows) {
-      await database.upsertItem(_rowToCompanion(row));
-    }
+    // REQ-007: atomic -- an app backgrounded/killed mid-import leaves no
+    // partially-applied state; either every row lands or none does.
+    await database.transaction(() async {
+      for (final row in rows) {
+        await database.upsertItem(_rowToCompanion(row));
+      }
+    });
     messenger.showSnackBar(
       SnackBar(content: Text('Imported ${rows.length} item(s)')),
     );

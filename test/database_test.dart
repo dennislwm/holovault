@@ -51,4 +51,27 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.single.name, 'Charizard (Renamed)');
   });
+
+  test(
+    'REQ-007: a failed transaction rolls back every write in it, not just the failing one',
+    () async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'existing', name: 'Pre'),
+      );
+
+      await expectLater(
+        db.transaction(() async {
+          await db.upsertItem(
+            CollectionItemsCompanion.insert(importedId: 'card-1', name: 'A'),
+          );
+          throw Exception('simulated mid-import failure');
+        }),
+        throwsException,
+      );
+
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.importedId, 'existing');
+    },
+  );
 }
