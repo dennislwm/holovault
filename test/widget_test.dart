@@ -83,8 +83,8 @@ void main() {
           database: db,
           pickFile: () async => '/fake/path/export.csv',
           parseFile: (path) async => [
-            {'importedId': 'card-1', 'name': 'Charizard', 'extra': null},
-            {'importedId': 'card-2', 'name': 'Blastoise', 'extra': null},
+            {'id': 'card-1', 'product_name': 'Charizard', 'extra': null},
+            {'id': 'card-2', 'product_name': 'Blastoise', 'extra': null},
           ],
         ),
       ),
@@ -105,7 +105,7 @@ void main() {
     WidgetTester tester,
   ) async {
     Future<List<Map<String, String?>>> parseFile(String path) async => [
-      {'importedId': 'card-1', 'name': 'Charizard', 'extra': null},
+      {'id': 'card-1', 'product_name': 'Charizard', 'extra': null},
     ];
     await tester.pumpWidget(
       MaterialApp(

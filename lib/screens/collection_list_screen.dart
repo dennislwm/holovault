@@ -69,8 +69,8 @@ class CollectionListScreen extends StatelessWidget {
     final rows = await parseFile(path);
     for (final row in rows) {
       await database.upsertItem(
-        importedId: row['importedId'] ?? '',
-        name: row['name'] ?? '',
+        importedId: row['id'] ?? '',
+        name: row['product_name'] ?? '',
         extra: row['extra'],
       );
     }
