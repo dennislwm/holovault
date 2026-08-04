@@ -74,7 +74,7 @@ void main() {
     await disposeAndFlush(tester);
   });
 
-  testWidgets('import button shows the picked file path', (
+  testWidgets('import parses rows and persists them via upsertItem', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -82,6 +82,10 @@ void main() {
         home: CollectionListScreen(
           database: db,
           pickFile: () async => '/fake/path/export.csv',
+          parseFile: (path) async => [
+            {'importedId': 'card-1', 'name': 'Charizard', 'extra': null},
+            {'importedId': 'card-2', 'name': 'Blastoise', 'extra': null},
+          ],
         ),
       ),
     );
@@ -90,7 +94,37 @@ void main() {
     await tester.tap(find.byIcon(Icons.file_upload));
     await tester.pumpAndSettle();
 
-    expect(find.text('Selected: /fake/path/export.csv'), findsOneWidget);
+    expect(find.text('Imported 2 item(s)'), findsOneWidget);
+    final rows = await db.select(db.collectionItems).get();
+    expect(rows, hasLength(2));
+
+    await disposeAndFlush(tester);
+  });
+
+  testWidgets('re-importing the same file never duplicates rows', (
+    WidgetTester tester,
+  ) async {
+    Future<List<Map<String, String?>>> parseFile(String path) async => [
+      {'importedId': 'card-1', 'name': 'Charizard', 'extra': null},
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CollectionListScreen(
+          database: db,
+          pickFile: () async => '/fake/path/export.csv',
+          parseFile: parseFile,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.file_upload));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.file_upload));
+    await tester.pumpAndSettle();
+
+    final rows = await db.select(db.collectionItems).get();
+    expect(rows, hasLength(1));
 
     await disposeAndFlush(tester);
   });
