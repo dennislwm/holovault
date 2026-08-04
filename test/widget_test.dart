@@ -40,7 +40,9 @@ void main() {
   testWidgets('lists items and opens the detail screen on tap', (
     WidgetTester tester,
   ) async {
-    await db.upsertItem(importedId: 'card-1', name: 'Charizard');
+    await db.upsertItem(
+      CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+    );
     await tester.pumpWidget(HolovaultApp(database: db));
     await tester.pumpAndSettle();
 
@@ -58,7 +60,9 @@ void main() {
   testWidgets('saving the detail form persists the edited name', (
     WidgetTester tester,
   ) async {
-    await db.upsertItem(importedId: 'card-1', name: 'Charizard');
+    await db.upsertItem(
+      CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+    );
     await tester.pumpWidget(HolovaultApp(database: db));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Charizard'));
@@ -100,6 +104,48 @@ void main() {
 
     await disposeAndFlush(tester);
   });
+
+  testWidgets(
+    'import coerces typed fields and converts the CSV null literal to real null',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CollectionListScreen(
+            database: db,
+            pickFile: () async => '/fake/path/export.csv',
+            parseFile: (path) async => [
+              {
+                'id': 'card-1',
+                'product_name': 'Charizard',
+                'quantity': '2',
+                'value_total': '10765.74',
+                'group_wishlist': 'false',
+                // ponytail: drift's default DateTimeColumn stores unix
+                // seconds, truncating sub-second precision -- using a
+                // whole-second timestamp here so the test isn't asserting
+                // on that unrelated storage-precision detail.
+                'date_added': '2026-01-18T22:45:41',
+                'tcgplayer_id': 'null',
+              },
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+
+      final row = (await db.select(db.collectionItems).get()).single;
+      expect(row.quantity, 2);
+      expect(row.valueTotal, 10765.74);
+      expect(row.groupWishlist, false);
+      expect(row.dateAdded, DateTime.parse('2026-01-18T22:45:41'));
+      expect(row.tcgplayerId, isNull);
+
+      await disposeAndFlush(tester);
+    },
+  );
 
   testWidgets('re-importing the same file never duplicates rows', (
     WidgetTester tester,

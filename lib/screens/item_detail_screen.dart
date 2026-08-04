@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 
@@ -38,12 +39,18 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   Future<void> _save(CollectionItem item, Map<String, dynamic> values) {
+    // Only name/extra are set here -- every other column stays absent, so
+    // drift's DoUpdate leaves the item's imported typed fields untouched.
     return widget.database.upsertItem(
-      importedId: item.importedId,
-      name: values['name'] as String,
-      extra: (values['extra'] as String?)?.isEmpty ?? true
-          ? null
-          : values['extra'] as String,
+      CollectionItemsCompanion.insert(
+        importedId: item.importedId,
+        name: values['name'] as String,
+        extra: Value(
+          (values['extra'] as String?)?.isEmpty ?? true
+              ? null
+              : values['extra'] as String,
+        ),
+      ),
     );
   }
 
