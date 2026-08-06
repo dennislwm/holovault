@@ -74,4 +74,41 @@ void main() {
       expect(rows.single.importedId, 'existing');
     },
   );
+
+  test(
+    'REQ-008: deleteMissingImportedIds removes rows absent from the new import set',
+    () async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Kept'),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Sold'),
+      );
+
+      await db.deleteMissingImportedIds(['card-1']);
+
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.importedId, 'card-1');
+    },
+  );
+
+  test(
+    'REQ-008: deleteMissingImportedIds is idempotent -- re-running with the same set changes nothing',
+    () async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Kept'),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Sold'),
+      );
+
+      await db.deleteMissingImportedIds(['card-1']);
+      await db.deleteMissingImportedIds(['card-1']);
+
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.importedId, 'card-1');
+    },
+  );
 }

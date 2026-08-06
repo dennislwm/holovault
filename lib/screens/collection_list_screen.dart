@@ -124,6 +124,11 @@ class CollectionListScreen extends StatelessWidget {
       for (final row in rows) {
         await database.upsertItem(_rowToCompanion(row));
       }
+      // REQ-008: a re-import is a full-inventory snapshot -- any row not
+      // in this import no longer exists in the source and is removed.
+      await database.deleteMissingImportedIds(
+        rows.map((row) => row['id'] ?? '').toList(),
+      );
     });
     messenger.showSnackBar(
       SnackBar(content: Text('Imported ${rows.length} item(s)')),

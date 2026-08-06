@@ -91,6 +91,15 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<CollectionItem>> watchAllItems() =>
       select(collectionItems).watch();
 
+  /// ADR-10, Option 1: removes any row whose `importedId` is absent from
+  /// the just-imported set -- an import is a full-inventory snapshot, so a
+  /// row missing from it means the source item is gone.
+  Future<void> deleteMissingImportedIds(List<String> importedIds) {
+    return (delete(
+      collectionItems,
+    )..where((t) => t.importedId.isNotIn(importedIds))).go();
+  }
+
   static QueryExecutor _openConnection() {
     return driftDatabase(
       name: 'holovault',
