@@ -118,6 +118,12 @@ class CollectionListScreen extends StatelessWidget {
       return;
     }
     final rows = await parseFile(path);
+    // REQ-009: an empty parse would make deleteMissingImportedIds() match
+    // every row (NOT IN () is vacuously true) and wipe the collection.
+    if (rows.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('Import found no rows')));
+      return;
+    }
     // REQ-007: atomic -- an app backgrounded/killed mid-import leaves no
     // partially-applied state; either every row lands or none does.
     await database.transaction(() async {

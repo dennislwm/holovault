@@ -205,6 +205,36 @@ void main() {
     await disposeAndFlush(tester);
   });
 
+  testWidgets(
+    'REQ-009: import with zero parsed rows leaves the existing collection untouched',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+      );
+      Future<List<Map<String, String?>>> parseFile(String path) async => [];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CollectionListScreen(
+            database: db,
+            pickFile: () async => '/fake/path/export.csv',
+            parseFile: parseFile,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Import found no rows'), findsOneWidget);
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.importedId, 'card-1');
+
+      await disposeAndFlush(tester);
+    },
+  );
+
   testWidgets('import button shows cancelled when the picker returns null', (
     WidgetTester tester,
   ) async {
