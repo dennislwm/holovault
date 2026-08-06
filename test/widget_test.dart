@@ -206,6 +206,61 @@ void main() {
   });
 
   testWidgets(
+    'REQ-010: import shows a SnackBar instead of crashing when parseFile() throws',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CollectionListScreen(
+            database: db,
+            pickFile: () async => '/fake/path/export.csv',
+            parseFile: (path) async => throw const FormatException('bad csv'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Import failed'), findsOneWidget);
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.importedId, 'card-1');
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-010: import is idempotent -- parseFile() throwing twice leaves state unchanged both times',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CollectionListScreen(
+            database: db,
+            pickFile: () async => '/fake/path/export.csv',
+            parseFile: (path) async => throw const FormatException('bad csv'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, isEmpty);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
     'REQ-011: import refuses a row with a malformed quantity instead of crashing',
     (WidgetTester tester) async {
       await db.upsertItem(

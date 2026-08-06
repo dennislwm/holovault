@@ -118,7 +118,15 @@ class CollectionListScreen extends StatelessWidget {
       messenger.showSnackBar(const SnackBar(content: Text('Import cancelled')));
       return;
     }
-    final rows = await parseFile(path);
+    // REQ-010: a malformed CSV/JSON file makes parseFile() throw -- surface
+    // it as a SnackBar like every other refusal path, not an uncaught crash.
+    final List<Map<String, String?>> rows;
+    try {
+      rows = await parseFile(path);
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      return;
+    }
     // REQ-009: an empty parse would make deleteMissingImportedIds() match
     // every row (NOT IN () is vacuously true) and wipe the collection.
     if (rows.isEmpty) {
