@@ -206,6 +206,67 @@ void main() {
   });
 
   testWidgets(
+    'REQ-011: import refuses a row with a malformed quantity instead of crashing',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+      );
+      Future<List<Map<String, String?>>> parseFile(String path) async => [
+        {'id': 'card-2', 'product_name': 'Blastoise', 'quantity': 'abc'},
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CollectionListScreen(
+            database: db,
+            pickFile: () async => '/fake/path/export.csv',
+            parseFile: parseFile,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Import refused'), findsOneWidget);
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.importedId, 'card-1');
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-011: import refuses the same malformed row twice, leaving state unchanged both times',
+    (WidgetTester tester) async {
+      Future<List<Map<String, String?>>> parseFile(String path) async => [
+        {'id': 'card-1', 'product_name': 'Charizard', 'date_added': 'not-a-date'},
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CollectionListScreen(
+            database: db,
+            pickFile: () async => '/fake/path/export.csv',
+            parseFile: parseFile,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, isEmpty);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
     'REQ-009: import with zero parsed rows leaves the existing collection untouched',
     (WidgetTester tester) async {
       await db.upsertItem(

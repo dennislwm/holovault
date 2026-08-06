@@ -15,6 +15,7 @@ dependencies:
   flutter_form_builder: ^10.3.0
   file_picker: ^11.0.3
   csv: ^8.0.0
+  json_schema: ^5.2.2
 
 dev_dependencies:
   flutter_test:

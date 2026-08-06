@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../database/database.dart';
+import '../import_schema.dart';
 import 'item_detail_screen.dart';
 
 /// ADR-06, Option A: acquires a file path via the native document picker.
@@ -123,6 +124,17 @@ class CollectionListScreen extends StatelessWidget {
     if (rows.isEmpty) {
       messenger.showSnackBar(const SnackBar(content: Text('Import found no rows')));
       return;
+    }
+    // REQ-011: refuse the whole import on the first row that would crash
+    // _rowToCompanion()'s coercion, instead of throwing uncaught mid-write.
+    for (var i = 0; i < rows.length; i++) {
+      final errors = validateRow(rows[i]);
+      if (errors.isNotEmpty) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Import refused: row ${i + 1} ${errors.first}')),
+        );
+        return;
+      }
     }
     // REQ-007: atomic -- an app backgrounded/killed mid-import leaves no
     // partially-applied state; either every row lands or none does.
