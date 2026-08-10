@@ -4,10 +4,15 @@ A Flutter iOS app for importing and browsing TCG collection data (CSV/JSON).
 
 ## Workflow
 
-    make setup    # flutter pub get
-    make analyze  # static checks/lints
-    make test     # run test suite
-    make run      # flutter run
+First run on a fresh checkout: [Maintainer setup](#maintainer-setup) (`flutter create` +
+`make setup`) must happen first -- nothing below runs without it.
+
+1. **`make setup`** -- `flutter pub get`. Nothing else runs without this.
+2. **`make analyze`** -- static checks/lints. Run before `test` to catch cheap errors first.
+3. **`make test`** -- run the test suite.
+4. **`make run`** -- launch the app (simulator or connected device).
+
+Day-to-day loop is 2 -> 3 -> 4; re-run 1 only when `pubspec.yaml` changes.
 
 ## Diagnostics
 
