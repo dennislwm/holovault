@@ -4,7 +4,6 @@
 .flutter-plugins-dependencies
 build/
 *.iml
+.idea/
 .DS_Store
-ios/Pods/
-ios/.symlinks/
-ios/Flutter/Flutter.podspec
+ios/

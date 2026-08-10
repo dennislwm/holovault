@@ -1,8 +1,10 @@
-.PHONY: help setup status test run build-ios analyze check-pins clean
+.PHONY: help setup status test run build-ios analyze check-pins clean boot-sim
+
+DEVICE ?= iPhone 16
 
 help:
 	@echo ""
-	@echo "Workflow: setup -> analyze -> test -> run"
+	@echo "Workflow: setup -> analyze -> test -> boot-sim -> run"
 	@echo ""
 	@echo "=== Targets ==="
 	@echo "  help          Show this help"
@@ -12,11 +14,16 @@ help:
 	@echo "                Requires: setup"
 	@echo "  run           flutter run (iOS simulator/device by default)"
 	@echo "                Requires: setup"
-	@echo "                Requires: ios/ -- see Maintainer setup"
-	@echo "                Requires: a booted iOS simulator or connected device"
+	@echo "                Requires: ios/"
+	@echo "                run 'flutter create --platforms=ios --org com.dennislwm --project-name holovault .' once"
+	@echo "                Requires: a booted iOS simulator or connected device -- run 'make boot-sim'"
 	@echo "  build-ios     flutter build ios"
 	@echo "                Requires: setup"
-	@echo "                Requires: ios/ -- see Maintainer setup"
+	@echo "                Requires: ios/"
+	@echo "                run 'flutter create --platforms=ios --org com.dennislwm --project-name holovault .' once"
+	@echo "  boot-sim      Boot an iOS simulator and open Simulator.app"
+	@echo "                DEVICE: $(DEVICE)"
+	@echo "                No devices listed at all? run 'make status' to check the iOS runtime is installed"
 	@echo "  analyze       flutter analyze (static checks/lints)"
 	@echo "                Requires: setup"
 	@echo "  check-pins    Flag pubspec.yaml dependencies with no version constraint"
@@ -34,6 +41,10 @@ test:
 
 run:
 	flutter run
+
+boot-sim:
+	@xcrun simctl list devices booted | grep -q "$(DEVICE)" || xcrun simctl boot "$(DEVICE)"
+	@open -a Simulator
 
 build-ios:
 	flutter build ios

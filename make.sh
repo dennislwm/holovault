@@ -7,8 +7,28 @@ function check_xcode {
   command -v xcodebuild > /dev/null 2>&1 || { echo "[ERROR][check_xcode]: xcodebuild not found -- install Xcode for iOS builds"; return 1; }
   local version_output
   version_output=$(xcodebuild -version 2>&1)
-  [ $? -eq 0 ] || { echo "[ERROR][check_xcode]: xcodebuild present but not usable -- $(echo "$version_output" | head -1)"; return 1; }
+  if [ $? -ne 0 ]; then
+    echo "[ERROR][check_xcode]: xcodebuild present but not usable -- $(echo "$version_output" | head -1)"
+    if [ -d /Applications/Xcode.app ]; then
+      echo "[ERROR][check_xcode]: fix: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+    else
+      echo "[ERROR][check_xcode]: fix: install Xcode.app first (App Store or https://developer.apple.com/download/all/), then sudo xcode-select -s /Applications/Xcode.app/Contents/Developer"
+    fi
+    return 1
+  fi
   echo "[OK]   xcodebuild found ($(echo "$version_output" | head -1))"
+}
+
+function check_ios_runtime {
+  command -v xcrun > /dev/null 2>&1 || return 0
+  local runtimes
+  runtimes=$(xcrun simctl list runtimes 2>/dev/null | grep -c "com.apple.CoreSimulator.SimRuntime.iOS")
+  if [ "$runtimes" -eq 0 ]; then
+    echo "[ERROR][check_ios_runtime]: no iOS simulator runtime installed"
+    echo "[ERROR][check_ios_runtime]: fix: xcodebuild -downloadPlatform iOS"
+    return 1
+  fi
+  echo "[OK]   iOS simulator runtime installed ($runtimes found)"
 }
 
 function check_pins {
@@ -32,8 +52,9 @@ function check_pins {
 function show_status {
   echo ""
   echo "=== Status ==="
-  check_flutter || true
-  check_xcode   || true
+  check_flutter     || true
+  check_xcode       || true
+  check_ios_runtime || true
   echo "=============="
   echo ""
 }
