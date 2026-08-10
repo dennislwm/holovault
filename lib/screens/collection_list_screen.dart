@@ -191,15 +191,27 @@ class CollectionListScreen extends StatelessWidget {
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
-              return ListTile(
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  child: Text(
+                    item.name.isEmpty ? '?' : item.name[0].toUpperCase(),
+                  ),
+                ),
                 title: Text(item.name),
                 subtitle: item.extra == null ? null : Text(item.extra!),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ItemDetailScreen(
-                      database: database,
-                      items: items,
-                      initialIndex: index,
+                trailing: item.quantity == null
+                    ? null
+                    : Chip(label: Text('×${item.quantity}')),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ItemDetailScreen(
+                        database: database,
+                        items: items,
+                        initialIndex: index,
+                      ),
                     ),
                   ),
                 ),

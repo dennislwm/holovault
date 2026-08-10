@@ -53,7 +53,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Item detail'), findsOneWidget);
-    expect(find.text('Charizard'), findsOneWidget);
+    // REQ-014: the item name now renders twice -- once in the hero banner,
+    // once in the editable name field below it.
+    expect(find.text('Charizard'), findsNWidgets(2));
 
     await disposeAndFlush(tester);
   });
@@ -316,6 +318,84 @@ void main() {
 
       final rows = await db.select(db.collectionItems).get();
       expect(rows, isEmpty);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-014: list row shows a quantity chip',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          quantity: const Value(3),
+        ),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      expect(find.text('×3'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-014: detail screen shows read-only imported fields grouped above the editable form',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Arceus V',
+          setName: const Value('Sword & Shield Promos'),
+          discriminator: const Value('267/S-P'),
+          rarity: const Value('Promo'),
+          quantity: const Value(1),
+          valueTotal: const Value(115.19),
+          valuePerUnit: const Value(115.19),
+          paidTotal: const Value(85.25),
+          paidPerUnit: const Value(85.25),
+          gradeType: const Value('PSA'),
+          gradeSubtype: const Value('10 GEM-MT'),
+          dateAdded: Value(DateTime.parse('2026-03-24T22:37:38')),
+        ),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Arceus V'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('IMPORTED DATA'), findsOneWidget);
+      expect(find.text('Sword & Shield Promos'), findsOneWidget);
+      expect(find.text('267/S-P'), findsOneWidget);
+      expect(find.text('Promo'), findsOneWidget);
+      expect(find.text('115.19'), findsNWidgets(2));
+      expect(find.text('85.25'), findsNWidgets(2));
+      expect(find.text('PSA 10 GEM-MT'), findsOneWidget);
+      expect(find.text('24 Mar 2026'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-014: detail screen shows a position indicator and swipe hint',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Blastoise'),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Charizard'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 / 2'), findsOneWidget);
+      expect(find.textContaining('swipe'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
