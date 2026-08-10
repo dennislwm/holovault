@@ -322,6 +322,41 @@ void main() {
   );
 
   testWidgets(
+    'REQ-012: import accepts "Unavailable" for value_total/value_per_unit as null, matching the real ShinyExport sentinel',
+    (WidgetTester tester) async {
+      Future<List<Map<String, String?>>> parseFile(String path) async => [
+        {
+          'id': 'card-1',
+          'product_name': 'Charizard',
+          'value_total': 'Unavailable',
+          'value_per_unit': 'Unavailable',
+        },
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CollectionListScreen(
+            database: db,
+            pickFile: () async => '/fake/path/export.json',
+            parseFile: parseFile,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.file_upload));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Imported'), findsOneWidget);
+      final rows = await db.select(db.collectionItems).get();
+      expect(rows, hasLength(1));
+      expect(rows.single.valueTotal, isNull);
+      expect(rows.single.valuePerUnit, isNull);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
     'REQ-009: import with zero parsed rows leaves the existing collection untouched',
     (WidgetTester tester) async {
       await db.upsertItem(

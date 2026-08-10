@@ -75,9 +75,15 @@ CollectionItemsCompanion _rowToCompanion(Map<String, String?> row) {
     discriminator: Value(row['discriminator']),
     rarity: Value(row['rarity']),
     quantity: Value(quantity == null ? null : int.parse(quantity)),
-    valueTotal: Value(valueTotal == null ? null : double.parse(valueTotal)),
+    valueTotal: Value(
+      valueTotal == null || valueTotal == 'Unavailable'
+          ? null
+          : double.parse(valueTotal),
+    ),
     valuePerUnit: Value(
-      valuePerUnit == null ? null : double.parse(valuePerUnit),
+      valuePerUnit == null || valuePerUnit == 'Unavailable'
+          ? null
+          : double.parse(valuePerUnit),
     ),
     valueCurrency: Value(row['value_currency']),
     paidTotal: Value(paidTotal == null ? null : double.parse(paidTotal)),

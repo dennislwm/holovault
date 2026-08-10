@@ -7,6 +7,10 @@ import 'package:json_schema/json_schema.dart';
 /// this validates string shape, not JSON type.
 const _integerPattern = r'^-?[0-9]+$';
 const _decimalPattern = r'^-?[0-9]+(\.[0-9]+)?$';
+// REQ-012: the real ShinyExport exporter emits the literal string
+// "Unavailable" for value_total/value_per_unit on a card with no listed
+// market value -- accept it here, coerced to null in _rowToCompanion.
+const _decimalOrUnavailablePattern = r'^(-?[0-9]+(\.[0-9]+)?|Unavailable)$';
 const _boolPattern = r'^(true|false)$';
 const _dateTimePattern = r'^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$';
 
@@ -18,8 +22,8 @@ final JsonSchema importRowSchema = JsonSchema.create({
   'type': 'object',
   'properties': {
     'quantity': {..._nullableStringPatternProperty, 'pattern': _integerPattern},
-    'value_total': {..._nullableStringPatternProperty, 'pattern': _decimalPattern},
-    'value_per_unit': {..._nullableStringPatternProperty, 'pattern': _decimalPattern},
+    'value_total': {..._nullableStringPatternProperty, 'pattern': _decimalOrUnavailablePattern},
+    'value_per_unit': {..._nullableStringPatternProperty, 'pattern': _decimalOrUnavailablePattern},
     'paid_total': {..._nullableStringPatternProperty, 'pattern': _decimalPattern},
     'paid_per_unit': {..._nullableStringPatternProperty, 'pattern': _decimalPattern},
     'group_wishlist': {..._nullableStringPatternProperty, 'pattern': _boolPattern},
