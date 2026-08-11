@@ -6,6 +6,21 @@ import 'overrides_schema.dart';
 
 part 'database.g.dart';
 
+/// ADR-07, Option 3: thrown by [AppDatabase.migration] when the on-disk
+/// database's version has no matching migration branch -- a rollback to an
+/// older app build, a restored backup predating a schema change, or file
+/// corruption, none of which should be allowed to silently no-op or crash
+/// on an unrelated query later.
+class UnsupportedSchemaVersionException implements Exception {
+  final int from;
+  UnsupportedSchemaVersionException(this.from);
+
+  @override
+  String toString() =>
+      'UnsupportedSchemaVersionException: no migration path from schema '
+      'version $from';
+}
+
 /// Real import-feature schema per ADR-09 (Option 1: native typed columns).
 /// Column types verified against `../13pyholofoil/input/ShinyExport-*.csv`'s
 /// real header and sample values -- see the ADR's column/type table.
@@ -56,6 +71,7 @@ class AppDatabase extends _$AppDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (m, from, to) async {
+      var handled = false;
       if (from < 2) {
         await m.addColumn(collectionItems, collectionItems.setName);
         await m.addColumn(collectionItems, collectionItems.brandName);
@@ -77,6 +93,7 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(collectionItems, collectionItems.doubleholoId);
         await m.addColumn(collectionItems, collectionItems.dateAdded);
         await m.addColumn(collectionItems, collectionItems.tag);
+        handled = true;
       }
       if (from < 3) {
         // ADR-03, Option 3: this branch runs at most once per install,
@@ -84,6 +101,14 @@ class AppDatabase extends _$AppDatabase {
         // true during the single migration off an older schema).
         await m.createTable(collectionItemOverrides);
         await m.createView(mergedItems);
+        handled = true;
+      }
+      // ADR-07, Option 3: `from` matched neither branch above -- an
+      // unrecognized/newer/rolled-back schema version. Fail loudly instead
+      // of silently no-op'ing and leaving queries to fail later with an
+      // unrelated SQLite error.
+      if (!handled) {
+        throw UnsupportedSchemaVersionException(from);
       }
     },
   );
