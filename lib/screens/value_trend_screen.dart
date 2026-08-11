@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/database.dart';
+import 'collection_list_screen.dart' show schemaErrorMessage;
 
 const _filterSetKey = 'value_trend_filter_set';
 const _filterRarityKey = 'value_trend_filter_rarity';
@@ -110,6 +111,27 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
       body: StreamBuilder<List<CollectionItem>>(
         stream: widget.database.watchAllItems(),
         builder: (context, snapshot) {
+          // REQ-018 (ADR-07): this screen holds its own independent
+          // watchAllItems() stream -- an unrecognized schema version must
+          // surface here too, not only on CollectionListScreen.
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48),
+                    const SizedBox(height: 12),
+                    Text(
+                      schemaErrorMessage(snapshot.error),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           if (!_loadedPersistedFilter) {
             return const Center(child: CircularProgressIndicator());
           }
