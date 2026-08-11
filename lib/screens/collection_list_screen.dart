@@ -104,6 +104,17 @@ CollectionItemsCompanion _rowToCompanion(Map<String, String?> row) {
   );
 }
 
+/// REQ-018 (ADR-07): the message shown when [CollectionListScreen]'s
+/// [StreamBuilder] errors -- a named message for the one error type this
+/// app can currently produce (an unrecognized on-disk schema version),
+/// a generic fallback for anything else.
+String schemaErrorMessage(Object? error) {
+  return error is UnsupportedSchemaVersionException
+      ? "This collection database is from an unrecognized app version and "
+            "can't be opened."
+      : 'Something went wrong loading your collection.';
+}
+
 /// ADR-04, mechanism A1: a mobile-width list of collection items, reactive
 /// to the underlying drift table via [AppDatabase.watchAllItems].
 class CollectionListScreen extends StatelessWidget {
@@ -193,6 +204,28 @@ class CollectionListScreen extends StatelessWidget {
       body: StreamBuilder<List<CollectionItem>>(
         stream: database.watchAllItems(),
         builder: (context, snapshot) {
+          // REQ-018 (ADR-07): an unrecognized on-disk schema version makes
+          // the underlying stream error with UnsupportedSchemaVersionException
+          // instead of emitting data -- surface it clearly instead of
+          // silently falling through to the empty-state message below.
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48),
+                    const SizedBox(height: 12),
+                    Text(
+                      schemaErrorMessage(snapshot.error),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           final items = snapshot.data ?? const [];
           if (items.isEmpty) {
             return const Center(child: Text('No items yet'));

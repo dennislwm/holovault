@@ -38,6 +38,22 @@ void main() {
     await disposeAndFlush(tester);
   });
 
+  test(
+    'REQ-018: schemaErrorMessage names UnsupportedSchemaVersionException '
+    'specifically, and falls back to a generic message for anything else',
+    () {
+      expect(
+        schemaErrorMessage(UnsupportedSchemaVersionException(4)),
+        "This collection database is from an unrecognized app version and "
+        "can't be opened.",
+      );
+      expect(
+        schemaErrorMessage(Exception('some other failure')),
+        'Something went wrong loading your collection.',
+      );
+    },
+  );
+
   testWidgets('lists items and opens the detail screen on tap', (
     WidgetTester tester,
   ) async {

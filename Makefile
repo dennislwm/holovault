@@ -40,7 +40,7 @@ status:
 	@source ./make.sh && show_status
 
 test:
-	flutter test
+	flutter test $(ARGS)
 
 run:
 	flutter run
