@@ -22,6 +22,20 @@ Day-to-day loop is 2 -> 3 -> 4; re-run 1 only when `pubspec.yaml` changes.
     make status      # check flutter/xcode toolchain is installed
     make check-pins  # flag pubspec.yaml dependencies with no version constraint
 
+## Override columns
+
+Requires: [ADR-03](https://github.com/dennislwm/holovault/wiki/decisions/adr-03-override-schema-extension)
+
+Adding a per-item override column (e.g. a custom note field) is a
+developer-time change, not something a user does from the app. Declare it
+in `overrides_config.json`, then regenerate:
+
+    make gen-overrides
+
+This writes `lib/database/overrides_schema.dart` from the config and runs
+drift's own codegen on top of it, so the new column exists as a real typed
+Dart field before the app is rebuilt.
+
 ## Maintainer setup
 
 Requires: [Flutter SDK](https://docs.flutter.dev/get-started/install)

@@ -1,4 +1,4 @@
-.PHONY: help setup status test run build-ios analyze check-pins clean boot-sim
+.PHONY: help setup status test run build-ios analyze check-pins clean boot-sim gen-overrides
 
 DEVICE ?= iPhone 16
 
@@ -28,6 +28,9 @@ help:
 	@echo "                Requires: setup"
 	@echo "  check-pins    Flag pubspec.yaml dependencies with no version constraint"
 	@echo "  clean         flutter clean"
+	@echo "  gen-overrides Regenerate override columns from overrides_config.json"
+	@echo "                Requires: setup"
+	@echo "                Run after editing overrides_config.json"
 	@echo ""
 
 setup:
@@ -54,6 +57,10 @@ analyze:
 
 check-pins:
 	@source ./make.sh && check_pins
+
+gen-overrides:
+	dart run tool/generate_overrides_schema.dart
+	flutter pub run build_runner build --delete-conflicting-outputs
 
 clean:
 	flutter clean

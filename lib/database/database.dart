@@ -2,6 +2,8 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'overrides_schema.dart';
+
 part 'database.g.dart';
 
 /// Real import-feature schema per ADR-09 (Option 1: native typed columns).
@@ -34,7 +36,10 @@ class CollectionItems extends Table {
   TextColumn get tag => text().nullable()();
 }
 
-@DriftDatabase(tables: [CollectionItems])
+@DriftDatabase(
+  tables: [CollectionItems, CollectionItemOverrides],
+  views: [MergedItems],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -43,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   /// ADR-09: v1 had only importedId/name/extra. v2 adds the 19 real
   /// ShinyExport fields -- all nullable, so no default value is needed for
@@ -73,6 +78,13 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(collectionItems, collectionItems.dateAdded);
         await m.addColumn(collectionItems, collectionItems.tag);
       }
+      if (from < 3) {
+        // ADR-03, Option 3: this branch runs at most once per install,
+        // gated by drift's own schemaVersion tracking (`from < 3` is only
+        // true during the single migration off an older schema).
+        await m.createTable(collectionItemOverrides);
+        await m.createView(mergedItems);
+      }
     },
   );
 
@@ -90,6 +102,12 @@ class AppDatabase extends _$AppDatabase {
   /// the underlying table changes, so the UI stays live during import/edit.
   Stream<List<CollectionItem>> watchAllItems() =>
       select(collectionItems).watch();
+
+  /// ADR-03, Option 3: `mergedItems` is a real drift `View`, so this gets
+  /// native `.watch()` reactivity for free -- no manual polling/refresh
+  /// wrapper, unlike Option 2's `customStatement`-created SQL view.
+  Stream<List<MergedItem>> watchMergedItems() =>
+      select(mergedItems).watch();
 
   /// ADR-10, Option 1: removes any row whose `importedId` is absent from
   /// the just-imported set -- an import is a full-inventory snapshot, so a

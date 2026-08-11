@@ -1125,16 +1125,663 @@ class CollectionItemsCompanion extends UpdateCompanion<CollectionItem> {
   }
 }
 
+class $CollectionItemOverridesTable extends CollectionItemOverrides
+    with TableInfo<$CollectionItemOverridesTable, CollectionItemOverride> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CollectionItemOverridesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _importedIdMeta =
+      const VerificationMeta('importedId');
+  @override
+  late final GeneratedColumn<String> importedId = GeneratedColumn<String>(
+      'imported_id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  @override
+  List<GeneratedColumn> get $columns => [importedId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'collection_item_overrides';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<CollectionItemOverride> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('imported_id')) {
+      context.handle(
+          _importedIdMeta,
+          importedId.isAcceptableOrUnknown(
+              data['imported_id']!, _importedIdMeta));
+    } else if (isInserting) {
+      context.missing(_importedIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => const {};
+  @override
+  CollectionItemOverride map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CollectionItemOverride(
+      importedId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}imported_id'])!,
+    );
+  }
+
+  @override
+  $CollectionItemOverridesTable createAlias(String alias) {
+    return $CollectionItemOverridesTable(attachedDatabase, alias);
+  }
+}
+
+class CollectionItemOverride extends DataClass
+    implements Insertable<CollectionItemOverride> {
+  final String importedId;
+  const CollectionItemOverride({required this.importedId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['imported_id'] = Variable<String>(importedId);
+    return map;
+  }
+
+  CollectionItemOverridesCompanion toCompanion(bool nullToAbsent) {
+    return CollectionItemOverridesCompanion(
+      importedId: Value(importedId),
+    );
+  }
+
+  factory CollectionItemOverride.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CollectionItemOverride(
+      importedId: serializer.fromJson<String>(json['importedId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'importedId': serializer.toJson<String>(importedId),
+    };
+  }
+
+  CollectionItemOverride copyWith({String? importedId}) =>
+      CollectionItemOverride(
+        importedId: importedId ?? this.importedId,
+      );
+  CollectionItemOverride copyWithCompanion(
+      CollectionItemOverridesCompanion data) {
+    return CollectionItemOverride(
+      importedId:
+          data.importedId.present ? data.importedId.value : this.importedId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CollectionItemOverride(')
+          ..write('importedId: $importedId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => importedId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CollectionItemOverride && other.importedId == this.importedId);
+}
+
+class CollectionItemOverridesCompanion
+    extends UpdateCompanion<CollectionItemOverride> {
+  final Value<String> importedId;
+  final Value<int> rowid;
+  const CollectionItemOverridesCompanion({
+    this.importedId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CollectionItemOverridesCompanion.insert({
+    required String importedId,
+    this.rowid = const Value.absent(),
+  }) : importedId = Value(importedId);
+  static Insertable<CollectionItemOverride> custom({
+    Expression<String>? importedId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (importedId != null) 'imported_id': importedId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CollectionItemOverridesCompanion copyWith(
+      {Value<String>? importedId, Value<int>? rowid}) {
+    return CollectionItemOverridesCompanion(
+      importedId: importedId ?? this.importedId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (importedId.present) {
+      map['imported_id'] = Variable<String>(importedId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CollectionItemOverridesCompanion(')
+          ..write('importedId: $importedId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class MergedItem extends DataClass {
+  final int id;
+  final String importedId;
+  final String name;
+  final String? extra;
+  final String? setName;
+  final String? brandName;
+  final String? discriminator;
+  final String? rarity;
+  final int? quantity;
+  final double? valueTotal;
+  final double? valuePerUnit;
+  final String? valueCurrency;
+  final double? paidTotal;
+  final double? paidPerUnit;
+  final String? paidCurrency;
+  final String? gradeType;
+  final String? gradeSubtype;
+  final String? groupName;
+  final bool? groupWishlist;
+  final String? tcgplayerId;
+  final String? pricechartingId;
+  final String? doubleholoId;
+  final DateTime? dateAdded;
+  final String? tag;
+  const MergedItem(
+      {required this.id,
+      required this.importedId,
+      required this.name,
+      this.extra,
+      this.setName,
+      this.brandName,
+      this.discriminator,
+      this.rarity,
+      this.quantity,
+      this.valueTotal,
+      this.valuePerUnit,
+      this.valueCurrency,
+      this.paidTotal,
+      this.paidPerUnit,
+      this.paidCurrency,
+      this.gradeType,
+      this.gradeSubtype,
+      this.groupName,
+      this.groupWishlist,
+      this.tcgplayerId,
+      this.pricechartingId,
+      this.doubleholoId,
+      this.dateAdded,
+      this.tag});
+  factory MergedItem.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MergedItem(
+      id: serializer.fromJson<int>(json['id']),
+      importedId: serializer.fromJson<String>(json['importedId']),
+      name: serializer.fromJson<String>(json['name']),
+      extra: serializer.fromJson<String?>(json['extra']),
+      setName: serializer.fromJson<String?>(json['setName']),
+      brandName: serializer.fromJson<String?>(json['brandName']),
+      discriminator: serializer.fromJson<String?>(json['discriminator']),
+      rarity: serializer.fromJson<String?>(json['rarity']),
+      quantity: serializer.fromJson<int?>(json['quantity']),
+      valueTotal: serializer.fromJson<double?>(json['valueTotal']),
+      valuePerUnit: serializer.fromJson<double?>(json['valuePerUnit']),
+      valueCurrency: serializer.fromJson<String?>(json['valueCurrency']),
+      paidTotal: serializer.fromJson<double?>(json['paidTotal']),
+      paidPerUnit: serializer.fromJson<double?>(json['paidPerUnit']),
+      paidCurrency: serializer.fromJson<String?>(json['paidCurrency']),
+      gradeType: serializer.fromJson<String?>(json['gradeType']),
+      gradeSubtype: serializer.fromJson<String?>(json['gradeSubtype']),
+      groupName: serializer.fromJson<String?>(json['groupName']),
+      groupWishlist: serializer.fromJson<bool?>(json['groupWishlist']),
+      tcgplayerId: serializer.fromJson<String?>(json['tcgplayerId']),
+      pricechartingId: serializer.fromJson<String?>(json['pricechartingId']),
+      doubleholoId: serializer.fromJson<String?>(json['doubleholoId']),
+      dateAdded: serializer.fromJson<DateTime?>(json['dateAdded']),
+      tag: serializer.fromJson<String?>(json['tag']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'importedId': serializer.toJson<String>(importedId),
+      'name': serializer.toJson<String>(name),
+      'extra': serializer.toJson<String?>(extra),
+      'setName': serializer.toJson<String?>(setName),
+      'brandName': serializer.toJson<String?>(brandName),
+      'discriminator': serializer.toJson<String?>(discriminator),
+      'rarity': serializer.toJson<String?>(rarity),
+      'quantity': serializer.toJson<int?>(quantity),
+      'valueTotal': serializer.toJson<double?>(valueTotal),
+      'valuePerUnit': serializer.toJson<double?>(valuePerUnit),
+      'valueCurrency': serializer.toJson<String?>(valueCurrency),
+      'paidTotal': serializer.toJson<double?>(paidTotal),
+      'paidPerUnit': serializer.toJson<double?>(paidPerUnit),
+      'paidCurrency': serializer.toJson<String?>(paidCurrency),
+      'gradeType': serializer.toJson<String?>(gradeType),
+      'gradeSubtype': serializer.toJson<String?>(gradeSubtype),
+      'groupName': serializer.toJson<String?>(groupName),
+      'groupWishlist': serializer.toJson<bool?>(groupWishlist),
+      'tcgplayerId': serializer.toJson<String?>(tcgplayerId),
+      'pricechartingId': serializer.toJson<String?>(pricechartingId),
+      'doubleholoId': serializer.toJson<String?>(doubleholoId),
+      'dateAdded': serializer.toJson<DateTime?>(dateAdded),
+      'tag': serializer.toJson<String?>(tag),
+    };
+  }
+
+  MergedItem copyWith(
+          {int? id,
+          String? importedId,
+          String? name,
+          Value<String?> extra = const Value.absent(),
+          Value<String?> setName = const Value.absent(),
+          Value<String?> brandName = const Value.absent(),
+          Value<String?> discriminator = const Value.absent(),
+          Value<String?> rarity = const Value.absent(),
+          Value<int?> quantity = const Value.absent(),
+          Value<double?> valueTotal = const Value.absent(),
+          Value<double?> valuePerUnit = const Value.absent(),
+          Value<String?> valueCurrency = const Value.absent(),
+          Value<double?> paidTotal = const Value.absent(),
+          Value<double?> paidPerUnit = const Value.absent(),
+          Value<String?> paidCurrency = const Value.absent(),
+          Value<String?> gradeType = const Value.absent(),
+          Value<String?> gradeSubtype = const Value.absent(),
+          Value<String?> groupName = const Value.absent(),
+          Value<bool?> groupWishlist = const Value.absent(),
+          Value<String?> tcgplayerId = const Value.absent(),
+          Value<String?> pricechartingId = const Value.absent(),
+          Value<String?> doubleholoId = const Value.absent(),
+          Value<DateTime?> dateAdded = const Value.absent(),
+          Value<String?> tag = const Value.absent()}) =>
+      MergedItem(
+        id: id ?? this.id,
+        importedId: importedId ?? this.importedId,
+        name: name ?? this.name,
+        extra: extra.present ? extra.value : this.extra,
+        setName: setName.present ? setName.value : this.setName,
+        brandName: brandName.present ? brandName.value : this.brandName,
+        discriminator:
+            discriminator.present ? discriminator.value : this.discriminator,
+        rarity: rarity.present ? rarity.value : this.rarity,
+        quantity: quantity.present ? quantity.value : this.quantity,
+        valueTotal: valueTotal.present ? valueTotal.value : this.valueTotal,
+        valuePerUnit:
+            valuePerUnit.present ? valuePerUnit.value : this.valuePerUnit,
+        valueCurrency:
+            valueCurrency.present ? valueCurrency.value : this.valueCurrency,
+        paidTotal: paidTotal.present ? paidTotal.value : this.paidTotal,
+        paidPerUnit: paidPerUnit.present ? paidPerUnit.value : this.paidPerUnit,
+        paidCurrency:
+            paidCurrency.present ? paidCurrency.value : this.paidCurrency,
+        gradeType: gradeType.present ? gradeType.value : this.gradeType,
+        gradeSubtype:
+            gradeSubtype.present ? gradeSubtype.value : this.gradeSubtype,
+        groupName: groupName.present ? groupName.value : this.groupName,
+        groupWishlist:
+            groupWishlist.present ? groupWishlist.value : this.groupWishlist,
+        tcgplayerId: tcgplayerId.present ? tcgplayerId.value : this.tcgplayerId,
+        pricechartingId: pricechartingId.present
+            ? pricechartingId.value
+            : this.pricechartingId,
+        doubleholoId:
+            doubleholoId.present ? doubleholoId.value : this.doubleholoId,
+        dateAdded: dateAdded.present ? dateAdded.value : this.dateAdded,
+        tag: tag.present ? tag.value : this.tag,
+      );
+  @override
+  String toString() {
+    return (StringBuffer('MergedItem(')
+          ..write('id: $id, ')
+          ..write('importedId: $importedId, ')
+          ..write('name: $name, ')
+          ..write('extra: $extra, ')
+          ..write('setName: $setName, ')
+          ..write('brandName: $brandName, ')
+          ..write('discriminator: $discriminator, ')
+          ..write('rarity: $rarity, ')
+          ..write('quantity: $quantity, ')
+          ..write('valueTotal: $valueTotal, ')
+          ..write('valuePerUnit: $valuePerUnit, ')
+          ..write('valueCurrency: $valueCurrency, ')
+          ..write('paidTotal: $paidTotal, ')
+          ..write('paidPerUnit: $paidPerUnit, ')
+          ..write('paidCurrency: $paidCurrency, ')
+          ..write('gradeType: $gradeType, ')
+          ..write('gradeSubtype: $gradeSubtype, ')
+          ..write('groupName: $groupName, ')
+          ..write('groupWishlist: $groupWishlist, ')
+          ..write('tcgplayerId: $tcgplayerId, ')
+          ..write('pricechartingId: $pricechartingId, ')
+          ..write('doubleholoId: $doubleholoId, ')
+          ..write('dateAdded: $dateAdded, ')
+          ..write('tag: $tag')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        id,
+        importedId,
+        name,
+        extra,
+        setName,
+        brandName,
+        discriminator,
+        rarity,
+        quantity,
+        valueTotal,
+        valuePerUnit,
+        valueCurrency,
+        paidTotal,
+        paidPerUnit,
+        paidCurrency,
+        gradeType,
+        gradeSubtype,
+        groupName,
+        groupWishlist,
+        tcgplayerId,
+        pricechartingId,
+        doubleholoId,
+        dateAdded,
+        tag
+      ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MergedItem &&
+          other.id == this.id &&
+          other.importedId == this.importedId &&
+          other.name == this.name &&
+          other.extra == this.extra &&
+          other.setName == this.setName &&
+          other.brandName == this.brandName &&
+          other.discriminator == this.discriminator &&
+          other.rarity == this.rarity &&
+          other.quantity == this.quantity &&
+          other.valueTotal == this.valueTotal &&
+          other.valuePerUnit == this.valuePerUnit &&
+          other.valueCurrency == this.valueCurrency &&
+          other.paidTotal == this.paidTotal &&
+          other.paidPerUnit == this.paidPerUnit &&
+          other.paidCurrency == this.paidCurrency &&
+          other.gradeType == this.gradeType &&
+          other.gradeSubtype == this.gradeSubtype &&
+          other.groupName == this.groupName &&
+          other.groupWishlist == this.groupWishlist &&
+          other.tcgplayerId == this.tcgplayerId &&
+          other.pricechartingId == this.pricechartingId &&
+          other.doubleholoId == this.doubleholoId &&
+          other.dateAdded == this.dateAdded &&
+          other.tag == this.tag);
+}
+
+class $MergedItemsView extends ViewInfo<$MergedItemsView, MergedItem>
+    implements HasResultSet {
+  final String? _alias;
+  @override
+  final _$AppDatabase attachedDatabase;
+  $MergedItemsView(this.attachedDatabase, [this._alias]);
+  $CollectionItemsTable get collectionItems =>
+      attachedDatabase.collectionItems.createAlias('t0');
+  $CollectionItemOverridesTable get collectionItemOverrides =>
+      attachedDatabase.collectionItemOverrides.createAlias('t1');
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        importedId,
+        name,
+        extra,
+        setName,
+        brandName,
+        discriminator,
+        rarity,
+        quantity,
+        valueTotal,
+        valuePerUnit,
+        valueCurrency,
+        paidTotal,
+        paidPerUnit,
+        paidCurrency,
+        gradeType,
+        gradeSubtype,
+        groupName,
+        groupWishlist,
+        tcgplayerId,
+        pricechartingId,
+        doubleholoId,
+        dateAdded,
+        tag
+      ];
+  @override
+  String get aliasedName => _alias ?? entityName;
+  @override
+  String get entityName => 'merged_items';
+  @override
+  Map<SqlDialect, String>? get createViewStatements => null;
+  @override
+  $MergedItemsView get asDslTable => this;
+  @override
+  MergedItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MergedItem(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      importedId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}imported_id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      extra: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}extra']),
+      setName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}set_name']),
+      brandName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}brand_name']),
+      discriminator: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}discriminator']),
+      rarity: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}rarity']),
+      quantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}quantity']),
+      valueTotal: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}value_total']),
+      valuePerUnit: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}value_per_unit']),
+      valueCurrency: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}value_currency']),
+      paidTotal: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}paid_total']),
+      paidPerUnit: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}paid_per_unit']),
+      paidCurrency: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}paid_currency']),
+      gradeType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}grade_type']),
+      gradeSubtype: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}grade_subtype']),
+      groupName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}group_name']),
+      groupWishlist: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}group_wishlist']),
+      tcgplayerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tcgplayer_id']),
+      pricechartingId: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}pricecharting_id']),
+      doubleholoId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}doubleholo_id']),
+      dateAdded: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}date_added']),
+      tag: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tag']),
+    );
+  }
+
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      generatedAs: GeneratedAs(collectionItems.id, false),
+      type: DriftSqlType.int);
+  late final GeneratedColumn<String> importedId = GeneratedColumn<String>(
+      'imported_id', aliasedName, false,
+      generatedAs: GeneratedAs(collectionItems.importedId, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      generatedAs: GeneratedAs(collectionItems.name, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> extra = GeneratedColumn<String>(
+      'extra', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.extra, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> setName = GeneratedColumn<String>(
+      'set_name', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.setName, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> brandName = GeneratedColumn<String>(
+      'brand_name', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.brandName, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> discriminator = GeneratedColumn<String>(
+      'discriminator', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.discriminator, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> rarity = GeneratedColumn<String>(
+      'rarity', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.rarity, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
+      'quantity', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.quantity, false),
+      type: DriftSqlType.int);
+  late final GeneratedColumn<double> valueTotal = GeneratedColumn<double>(
+      'value_total', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.valueTotal, false),
+      type: DriftSqlType.double);
+  late final GeneratedColumn<double> valuePerUnit = GeneratedColumn<double>(
+      'value_per_unit', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.valuePerUnit, false),
+      type: DriftSqlType.double);
+  late final GeneratedColumn<String> valueCurrency = GeneratedColumn<String>(
+      'value_currency', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.valueCurrency, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<double> paidTotal = GeneratedColumn<double>(
+      'paid_total', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.paidTotal, false),
+      type: DriftSqlType.double);
+  late final GeneratedColumn<double> paidPerUnit = GeneratedColumn<double>(
+      'paid_per_unit', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.paidPerUnit, false),
+      type: DriftSqlType.double);
+  late final GeneratedColumn<String> paidCurrency = GeneratedColumn<String>(
+      'paid_currency', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.paidCurrency, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> gradeType = GeneratedColumn<String>(
+      'grade_type', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.gradeType, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> gradeSubtype = GeneratedColumn<String>(
+      'grade_subtype', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.gradeSubtype, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> groupName = GeneratedColumn<String>(
+      'group_name', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.groupName, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<bool> groupWishlist = GeneratedColumn<bool>(
+      'group_wishlist', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.groupWishlist, false),
+      type: DriftSqlType.bool,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("group_wishlist" IN (0, 1))'));
+  late final GeneratedColumn<String> tcgplayerId = GeneratedColumn<String>(
+      'tcgplayer_id', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.tcgplayerId, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> pricechartingId = GeneratedColumn<String>(
+      'pricecharting_id', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.pricechartingId, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> doubleholoId = GeneratedColumn<String>(
+      'doubleholo_id', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.doubleholoId, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<DateTime> dateAdded = GeneratedColumn<DateTime>(
+      'date_added', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.dateAdded, false),
+      type: DriftSqlType.dateTime);
+  late final GeneratedColumn<String> tag = GeneratedColumn<String>(
+      'tag', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItems.tag, false),
+      type: DriftSqlType.string);
+  @override
+  $MergedItemsView createAlias(String alias) {
+    return $MergedItemsView(attachedDatabase, alias);
+  }
+
+  @override
+  Query? get query =>
+      (attachedDatabase.selectOnly(collectionItems)..addColumns($columns))
+          .join([
+        leftOuterJoin(
+            collectionItemOverrides,
+            collectionItemOverrides.importedId
+                .equalsExp(collectionItems.importedId))
+      ]);
+  @override
+  Set<String> get readTables =>
+      const {'collection_items', 'collection_item_overrides'};
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CollectionItemsTable collectionItems =
       $CollectionItemsTable(this);
+  late final $CollectionItemOverridesTable collectionItemOverrides =
+      $CollectionItemOverridesTable(this);
+  late final $MergedItemsView mergedItems = $MergedItemsView(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [collectionItems];
+  List<DatabaseSchemaEntity> get allSchemaEntities =>
+      [collectionItems, collectionItemOverrides, mergedItems];
 }
 
 typedef $$CollectionItemsTableCreateCompanionBuilder = CollectionItemsCompanion
@@ -1599,10 +2246,133 @@ typedef $$CollectionItemsTableProcessedTableManager = ProcessedTableManager<
     ),
     CollectionItem,
     PrefetchHooks Function()>;
+typedef $$CollectionItemOverridesTableCreateCompanionBuilder
+    = CollectionItemOverridesCompanion Function({
+  required String importedId,
+  Value<int> rowid,
+});
+typedef $$CollectionItemOverridesTableUpdateCompanionBuilder
+    = CollectionItemOverridesCompanion Function({
+  Value<String> importedId,
+  Value<int> rowid,
+});
+
+class $$CollectionItemOverridesTableFilterComposer
+    extends Composer<_$AppDatabase, $CollectionItemOverridesTable> {
+  $$CollectionItemOverridesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get importedId => $composableBuilder(
+      column: $table.importedId, builder: (column) => ColumnFilters(column));
+}
+
+class $$CollectionItemOverridesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CollectionItemOverridesTable> {
+  $$CollectionItemOverridesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get importedId => $composableBuilder(
+      column: $table.importedId, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CollectionItemOverridesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CollectionItemOverridesTable> {
+  $$CollectionItemOverridesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get importedId => $composableBuilder(
+      column: $table.importedId, builder: (column) => column);
+}
+
+class $$CollectionItemOverridesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CollectionItemOverridesTable,
+    CollectionItemOverride,
+    $$CollectionItemOverridesTableFilterComposer,
+    $$CollectionItemOverridesTableOrderingComposer,
+    $$CollectionItemOverridesTableAnnotationComposer,
+    $$CollectionItemOverridesTableCreateCompanionBuilder,
+    $$CollectionItemOverridesTableUpdateCompanionBuilder,
+    (
+      CollectionItemOverride,
+      BaseReferences<_$AppDatabase, $CollectionItemOverridesTable,
+          CollectionItemOverride>
+    ),
+    CollectionItemOverride,
+    PrefetchHooks Function()> {
+  $$CollectionItemOverridesTableTableManager(
+      _$AppDatabase db, $CollectionItemOverridesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CollectionItemOverridesTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CollectionItemOverridesTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CollectionItemOverridesTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> importedId = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CollectionItemOverridesCompanion(
+            importedId: importedId,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String importedId,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CollectionItemOverridesCompanion.insert(
+            importedId: importedId,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CollectionItemOverridesTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $CollectionItemOverridesTable,
+        CollectionItemOverride,
+        $$CollectionItemOverridesTableFilterComposer,
+        $$CollectionItemOverridesTableOrderingComposer,
+        $$CollectionItemOverridesTableAnnotationComposer,
+        $$CollectionItemOverridesTableCreateCompanionBuilder,
+        $$CollectionItemOverridesTableUpdateCompanionBuilder,
+        (
+          CollectionItemOverride,
+          BaseReferences<_$AppDatabase, $CollectionItemOverridesTable,
+              CollectionItemOverride>
+        ),
+        CollectionItemOverride,
+        PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$CollectionItemsTableTableManager get collectionItems =>
       $$CollectionItemsTableTableManager(_db, _db.collectionItems);
+  $$CollectionItemOverridesTableTableManager get collectionItemOverrides =>
+      $$CollectionItemOverridesTableTableManager(
+          _db, _db.collectionItemOverrides);
 }
