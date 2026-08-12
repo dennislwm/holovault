@@ -38,6 +38,8 @@ One-time device pairing:
 
 A free-account certificate expires after 7 days -- re-run `make run` weekly to refresh it. Longer-lived installs need the paid Developer Program, not worth it for testing alone.
 
+`make run` installs a Debug build, which refuses to launch once you disconnect from the Mac -- iOS blocks the `ptrace` access a debug build needs unless `flutter`/Xcode is attached. To keep using the app disconnected, run `make run-release` instead -- same install flow, but the app keeps working standalone (no hot reload/debug console, since it's optimized).
+
 ## Diagnostics
 
     make status      # check flutter/xcode toolchain is installed

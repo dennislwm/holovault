@@ -1,4 +1,4 @@
-.PHONY: help setup status test run build-ios analyze check-pins clean boot-sim gen-overrides
+.PHONY: help setup status test run run-release build-ios analyze check-pins clean boot-sim gen-overrides
 
 DEVICE ?= iPhone 16
 
@@ -16,6 +16,11 @@ help:
 	@echo "                Requires: setup"
 	@echo "                Requires: ios/"
 	@echo "                run 'flutter create --platforms=ios --org com.dennislwm --project-name holovault .' once"
+	@echo "                Requires: a booted iOS simulator or connected device -- run 'make boot-sim'"
+	@echo "  run-release   flutter run --release -- builds a standalone install that keeps working"
+	@echo "                after disconnecting from the Mac (a debug build refuses to launch"
+	@echo "                without an attached flutter/Xcode session -- iOS blocks ptrace outside it)"
+	@echo "                Requires: setup"
 	@echo "                Requires: a booted iOS simulator or connected device -- run 'make boot-sim'"
 	@echo "  build-ios     flutter build ios"
 	@echo "                Requires: setup"
@@ -44,6 +49,9 @@ test:
 
 run:
 	flutter run
+
+run-release:
+	flutter run --release
 
 boot-sim:
 	@xcrun simctl list devices booted | grep -q "$(DEVICE)" || xcrun simctl boot "$(DEVICE)"
