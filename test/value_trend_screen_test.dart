@@ -351,4 +351,35 @@ void main() {
       await disposeAndFlush(tester);
     },
   );
+
+  testWidgets(
+    'a long set name does not overflow the filter dropdown row',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          setName: const Value(
+            'A Very Long Expansion Set Name That Would Never Fit On One Line',
+          ),
+          valueTotal: const Value(100.0),
+          dateAdded: Value(DateTime(2026, 1, 1)),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ValueTrendScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Set: All'));
+      await tester.pumpAndSettle();
+      await tester
+          .tap(find.text('A Very Long Expansion Set Name That Would Never Fit On One Line').last);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+
+      await disposeAndFlush(tester);
+    },
+  );
 }

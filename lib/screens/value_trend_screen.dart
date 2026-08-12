@@ -89,17 +89,25 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
     required String? selected,
     required ValueChanged<String?> onChanged,
   }) {
-    return DropdownButton<String?>(
-      hint: Text(label),
-      value: selected,
-      items: [
-        DropdownMenuItem<String?>(value: null, child: Text('$label: All')),
-        for (final v in values) DropdownMenuItem<String?>(value: v, child: Text(v)),
-      ],
-      onChanged: (v) {
-        onChanged(v);
-        _saveFilter();
-      },
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 130),
+      child: DropdownButton<String?>(
+        isExpanded: true,
+        hint: Text(label),
+        value: selected,
+        selectedItemBuilder: (context) => [
+          Text('$label: All', overflow: TextOverflow.ellipsis),
+          for (final v in values) Text('$label: $v', overflow: TextOverflow.ellipsis),
+        ],
+        items: [
+          DropdownMenuItem<String?>(value: null, child: Text('$label: All')),
+          for (final v in values) DropdownMenuItem<String?>(value: v, child: Text(v)),
+        ],
+        onChanged: (v) {
+          onChanged(v);
+          _saveFilter();
+        },
+      ),
     );
   }
 
