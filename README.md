@@ -17,6 +17,18 @@ First run on a fresh checkout: [Maintainer setup](#maintainer-setup) (`flutter c
 
 Day-to-day loop is 2 -> 3 -> 4; re-run 1 only when `pubspec.yaml` changes.
 
+## Physical device testing
+
+Requires: a free Apple ID signed into Xcode (Xcode -> Settings -> Accounts) -- no paid Developer Program needed.
+
+One-time device pairing:
+
+1. Plug your iPhone into your Mac (or pair over WiFi via Xcode's wireless debugging).
+2. Run `make run` with the phone selected as the target device -- Xcode auto-provisions a free developer certificate for it.
+3. On the phone: Settings -> General -> VPN & Device Management -> trust the certificate once.
+
+A free-account certificate expires after 7 days -- re-run `make run` weekly to refresh it. Longer-lived installs need the paid Developer Program, not worth it for testing alone.
+
 ## Diagnostics
 
     make status      # check flutter/xcode toolchain is installed
