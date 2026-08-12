@@ -28,8 +28,13 @@ One-time device pairing:
 2. Plug your iPhone into your Mac and unlock it. Wireless pairing (Xcode -> Window -> Devices and Simulators, "Connect via network") is optional and its exact UI varies by Xcode version -- if you don't see it, stick with USB; it's not required for `make run`.
 3. Run `flutter devices` -- your phone should appear under the connected devices list.
    - Not listed? Check the phone screen for a "Trust This Computer?" prompt (can appear silently after unplug/replug) and accept it. If Xcode's own Devices and Simulators window (Window -> Devices and Simulators) doesn't see it either, it's a cable or port issue, not a Flutter one -- try a different cable (some are charge-only) or a different USB port.
-4. Run `make run` with the phone selected as the target device -- Xcode auto-provisions a free developer certificate for it.
-5. On the phone: Settings -> General -> VPN & Device Management -> trust the certificate once.
+4. `make run` (or `flutter run -d <device-id>`) fails the first time with "No valid code signing certificates were found" -- this needs one manual Xcode step before it can auto-provision anything:
+   - `open ios/Runner.xcworkspace`
+   - Left sidebar -> **Runner** (project) -> under TARGETS select **Runner** (target) -> **Signing & Capabilities** tab.
+   - **Team** dropdown -> your Apple ID. Not listed? Xcode -> Settings -> Accounts -> **+** -> sign in first.
+   - Your phone must be selected as the build target in Xcode's toolbar device picker for it to register with your account automatically.
+5. Re-run `make run` -- it now succeeds and installs the app.
+6. On the phone: Settings -> General -> VPN & Device Management -> trust the certificate once.
 
 A free-account certificate expires after 7 days -- re-run `make run` weekly to refresh it. Longer-lived installs need the paid Developer Program, not worth it for testing alone.
 
