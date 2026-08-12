@@ -8,10 +8,12 @@ import 'collection_list_screen.dart' show schemaErrorMessage;
 const _filterSetKey = 'value_trend_filter_set';
 const _filterRarityKey = 'value_trend_filter_rarity';
 const _filterGradeTypeKey = 'value_trend_filter_grade_type';
+const _filterExcludeSealedKey = 'value_trend_filter_exclude_sealed';
 
 /// ADR-12, Option 2: a cumulative value-trend chart over `watchAllItems()`,
-/// filterable by set/rarity/grade type, with the last-used filter persisted
-/// via shared_preferences so it survives app restart (REQ-015). Picker is a
+/// filterable by set/rarity/grade type, with an independent "exclude sealed"
+/// toggle (REQ-022), and the last-used filter persisted via
+/// shared_preferences so it survives app restart (REQ-015). Picker is a
 /// native `DropdownButton` per field, not the original dialog+chip picker --
 /// see Conventions.md.
 class ValueTrendScreen extends StatefulWidget {
@@ -27,6 +29,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
   String? _filterSet;
   String? _filterRarity;
   String? _filterGradeType;
+  bool _filterExcludeSealed = false;
   bool _loadedPersistedFilter = false;
 
   @override
@@ -41,6 +44,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
       _filterSet = prefs.getString(_filterSetKey);
       _filterRarity = prefs.getString(_filterRarityKey);
       _filterGradeType = prefs.getString(_filterGradeTypeKey);
+      _filterExcludeSealed = prefs.getBool(_filterExcludeSealedKey) ?? false;
       _loadedPersistedFilter = true;
     });
   }
@@ -58,6 +62,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
         await prefs.setString(entry.key, entry.value!);
       }
     }
+    await prefs.setBool(_filterExcludeSealedKey, _filterExcludeSealed);
   }
 
   List<CollectionItem> _applyFilter(
@@ -65,6 +70,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
     required String? filterSet,
     required String? filterRarity,
     required String? filterGradeType,
+    required bool filterExcludeSealed,
   }) {
     return items.where((item) {
       if (filterSet != null && item.setName != filterSet) return false;
@@ -72,6 +78,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
       if (filterGradeType != null && item.gradeType != filterGradeType) {
         return false;
       }
+      if (filterExcludeSealed && item.rarity == 'Sealed') return false;
       return true;
     }).toList();
   }
@@ -144,6 +151,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
             filterSet: effectiveFilterSet,
             filterRarity: effectiveFilterRarity,
             filterGradeType: effectiveFilterGradeType,
+            filterExcludeSealed: _filterExcludeSealed,
           );
 
           // REQ-015: cumulative running total over time, sorted by
@@ -190,6 +198,14 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                       values: gradeTypes,
                       selected: effectiveFilterGradeType,
                       onChanged: (v) => setState(() => _filterGradeType = v),
+                    ),
+                    FilterChip(
+                      label: const Text('Exclude sealed'),
+                      selected: _filterExcludeSealed,
+                      onSelected: (v) {
+                        setState(() => _filterExcludeSealed = v);
+                        _saveFilter();
+                      },
                     ),
                   ],
                 ),

@@ -305,4 +305,50 @@ void main() {
       await disposeAndFlush(tester);
     },
   );
+
+  testWidgets(
+    'REQ-022: Exclude sealed drops sealed items, independent of the Grade type filter',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard VMAX',
+          rarity: const Value('Holo Rare'),
+          gradeType: const Value('PSA'),
+          valueTotal: const Value(100.0),
+          dateAdded: Value(DateTime(2026, 1, 1)),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-2',
+          name: 'Base Set Booster Box',
+          rarity: const Value('Sealed'),
+          gradeType: const Value('PSA'),
+          valueTotal: const Value(500.0),
+          dateAdded: Value(DateTime(2026, 2, 1)),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ValueTrendScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      // Both items match Grade type = PSA before the toggle is applied.
+      await tester.tap(find.text('Grade type: All'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PSA').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Matching items · 2'), findsOneWidget);
+
+      await tester.tap(find.text('Exclude sealed'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Matching items · 1'), findsOneWidget);
+      expect(find.text('Charizard VMAX'), findsOneWidget);
+      expect(find.text('Base Set Booster Box'), findsNothing);
+
+      await disposeAndFlush(tester);
+    },
+  );
 }
