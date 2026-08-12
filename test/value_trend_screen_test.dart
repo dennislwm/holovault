@@ -54,7 +54,7 @@ void main() {
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '150.0',
+        '150.00',
       );
       expect(find.byType(LineChart), findsOneWidget);
       expect(find.text('Matching items · 2'), findsOneWidget);
@@ -93,7 +93,7 @@ void main() {
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '120.0',
+        '120.00',
       );
 
       await tester.tap(find.text('Set: All'));
@@ -103,7 +103,7 @@ void main() {
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '100.0',
+        '100.00',
       );
 
       await disposeAndFlush(tester);
@@ -143,7 +143,7 @@ void main() {
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '100.0',
+        '100.00',
       );
 
       await disposeAndFlush(tester);
@@ -178,7 +178,7 @@ void main() {
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '120.0',
+        '120.00',
       );
 
       await tester.tap(find.text('Grade type: All'));
@@ -188,7 +188,7 @@ void main() {
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '100.0',
+        '100.00',
       );
 
       await disposeAndFlush(tester);
@@ -219,7 +219,7 @@ void main() {
       expect(find.text('Set: All'), findsOneWidget);
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '100.0',
+        '100.00',
       );
 
       await disposeAndFlush(tester);
@@ -254,18 +254,53 @@ void main() {
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '150.0',
+        '150.00',
       );
       expect(
         tester
             .widget<Text>(find.byKey(const Key('value-trend-paid-total')))
             .data,
-        'Paid: 100.0',
+        'Paid: 100.00',
       );
       expect(
         tester.widget<LineChart>(find.byType(LineChart)).data.lineBarsData,
         hasLength(2),
       );
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'the matching items list shows each item\'s paid total alongside its value total',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          valueTotal: const Value(100.0),
+          paidTotal: const Value(60.0),
+          dateAdded: Value(DateTime(2026, 1, 1)),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-2',
+          name: 'Blastoise',
+          valueTotal: const Value(50.0),
+          paidTotal: const Value(40.0),
+          dateAdded: Value(DateTime(2026, 2, 1)),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ValueTrendScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      // Per-item row values (60.00, 40.00), distinct from the header's
+      // cumulative "Paid: 100.00" (60 + 40).
+      expect(find.text('Paid: 60.00'), findsOneWidget);
+      expect(find.text('Paid: 40.00'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },

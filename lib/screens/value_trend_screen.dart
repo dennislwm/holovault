@@ -195,12 +195,12 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  total.toString(),
+                  total.toStringAsFixed(2),
                   key: const Key('value-trend-total'),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 Text(
-                  'Paid: ${totalPaid.toString()}',
+                  'Paid: ${totalPaid.toStringAsFixed(2)}',
                   key: const Key('value-trend-paid-total'),
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
@@ -248,7 +248,16 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                             ],
                           ),
                         ),
-                        Text(item.valueTotal?.toString() ?? '--'),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(item.valueTotal?.toStringAsFixed(2) ?? '--'),
+                            Text(
+                              'Paid: ${item.paidTotal?.toStringAsFixed(2) ?? '--'}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
