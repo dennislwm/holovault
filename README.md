@@ -23,9 +23,13 @@ Requires: a free Apple ID signed into Xcode (Xcode -> Settings -> Accounts) -- n
 
 One-time device pairing:
 
-1. Plug your iPhone into your Mac (or pair over WiFi via Xcode's wireless debugging).
-2. Run `make run` with the phone selected as the target device -- Xcode auto-provisions a free developer certificate for it.
-3. On the phone: Settings -> General -> VPN & Device Management -> trust the certificate once.
+1. On the phone: Settings -> Privacy & Security -> Developer Mode -> on, restart, then confirm "Turn On Developer Mode?" after unlock.
+   - Missing from Privacy & Security entirely? It appears automatically the first time Xcode tries to install a build -- skip ahead and try step 3, then come back.
+2. Plug your iPhone into your Mac and unlock it (or pair over WiFi via Xcode's wireless debugging: Xcode -> Window -> Devices and Simulators, select the phone, check "Connect via network").
+3. Run `flutter devices` -- your phone should appear under the connected devices list.
+   - Not listed? Check the phone screen for a "Trust This Computer?" prompt (can appear silently after unplug/replug) and accept it. If Xcode's own Devices and Simulators window (Window -> Devices and Simulators) doesn't see it either, it's a cable or port issue, not a Flutter one -- try a different cable (some are charge-only) or a different USB port.
+4. Run `make run` with the phone selected as the target device -- Xcode auto-provisions a free developer certificate for it.
+5. On the phone: Settings -> General -> VPN & Device Management -> trust the certificate once.
 
 A free-account certificate expires after 7 days -- re-run `make run` weekly to refresh it. Longer-lived installs need the paid Developer Program, not worth it for testing alone.
 
