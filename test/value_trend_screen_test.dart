@@ -353,6 +353,38 @@ void main() {
   );
 
   testWidgets(
+    'REQ-023: Rarity=Sealed + Exclude sealed together yield zero matching items',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Base Set Booster Box',
+          rarity: const Value('Sealed'),
+          valueTotal: const Value(500.0),
+          dateAdded: Value(DateTime(2026, 2, 1)),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ValueTrendScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Rarity: All'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sealed').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Matching items · 1'), findsOneWidget);
+
+      await tester.tap(find.text('Exclude sealed'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Matching items · 0'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
     'a long set name does not overflow the filter dropdown row',
     (WidgetTester tester) async {
       await db.upsertItem(
