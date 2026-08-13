@@ -114,6 +114,78 @@ String schemaErrorMessage(Object? error) {
       : 'Something went wrong loading your collection.';
 }
 
+/// ADR-17, Option 1: category totals for the Collection Distribution card.
+/// Derivation confirmed against real data (see ADR-17 Decision Drivers):
+/// `rarity == 'Sealed'` -> Sealed; else `gradeType == 'Ungraded'` ->
+/// Ungraded; else -> Graded. Sums `valueTotal`, treating a null total as 0.
+Map<String, double> collectionDistribution(List<CollectionItem> items) {
+  final totals = {'Sealed': 0.0, 'Graded': 0.0, 'Ungraded': 0.0};
+  for (final item in items) {
+    final category = item.rarity == 'Sealed'
+        ? 'Sealed'
+        : item.gradeType == 'Ungraded'
+        ? 'Ungraded'
+        : 'Graded';
+    totals[category] = totals[category]! + (item.valueTotal ?? 0);
+  }
+  return totals;
+}
+
+/// ADR-17, Option 1: stacked rows, each a category label + $ amount + %
+/// inline with a native [LinearProgressIndicator] underneath.
+class CollectionDistributionCard extends StatelessWidget {
+  const CollectionDistributionCard({super.key, required this.items});
+
+  final List<CollectionItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = collectionDistribution(items);
+    final grandTotal = totals.values.fold(0.0, (sum, v) => sum + v);
+    return Card(
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'COLLECTION DISTRIBUTION',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: 8),
+            for (final category in ['Sealed', 'Graded', 'Ungraded'])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(category, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text(
+                          grandTotal == 0
+                              ? '\$${totals[category]!.toStringAsFixed(2)} · 0%'
+                              : '\$${totals[category]!.toStringAsFixed(2)} · '
+                                    '${(totals[category]! / grandTotal * 100).toStringAsFixed(1)}%',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: grandTotal == 0 ? 0 : totals[category]! / grandTotal,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// ADR-04, mechanism A1: a mobile-width list of collection items, reactive
 /// to the underlying drift table via [AppDatabase.watchAllItems].
 class CollectionListScreen extends StatelessWidget {
@@ -221,9 +293,12 @@ class CollectionListScreen extends StatelessWidget {
             return const Center(child: Text('No items yet'));
           }
           return ListView.builder(
-            itemCount: items.length,
+            itemCount: items.length + 1,
             itemBuilder: (context, index) {
-              final item = items[index];
+              if (index == 0) {
+                return CollectionDistributionCard(items: items);
+              }
+              final item = items[index - 1];
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: ListTile(
@@ -243,7 +318,7 @@ class CollectionListScreen extends StatelessWidget {
                       builder: (_) => ItemDetailScreen(
                         database: database,
                         items: items,
-                        initialIndex: index,
+                        initialIndex: index - 1,
                       ),
                     ),
                   ),

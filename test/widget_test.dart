@@ -540,6 +540,47 @@ void main() {
     },
   );
 
+  testWidgets(
+    'REQ-029: Collection Distribution card shows Sealed/Graded/Ungraded '
+    'amount and percent inline, above the item list',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Booster Box',
+          rarity: const Value('Sealed'),
+          valueTotal: const Value(150.0),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-2',
+          name: 'Arceus V',
+          gradeType: const Value('PSA'),
+          valueTotal: const Value(50.0),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-3',
+          name: 'Pikachu',
+          gradeType: const Value('Ungraded'),
+          valueTotal: const Value(0.0),
+        ),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      expect(find.text('COLLECTION DISTRIBUTION'), findsOneWidget);
+      expect(find.text('\$150.00 · 75.0%'), findsOneWidget);
+      expect(find.text('\$50.00 · 25.0%'), findsOneWidget);
+      expect(find.text('\$0.00 · 0.0%'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNWidgets(3));
+
+      await disposeAndFlush(tester);
+    },
+  );
+
   testWidgets('import button shows cancelled when the picker returns null', (
     WidgetTester tester,
   ) async {
