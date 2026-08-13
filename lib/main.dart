@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'database/database.dart';
+import 'screens/best_returns_screen.dart';
 import 'screens/collection_list_screen.dart';
 import 'screens/value_trend_screen.dart';
 
@@ -49,11 +50,13 @@ class _HolovaultShellState extends State<HolovaultShell> {
         children: [
           CollectionListScreen(database: widget.database),
           ValueTrendScreen(database: widget.database),
+          BestReturnsScreen(database: widget.database),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tabIndex,
         onTap: (index) => setState(() => _tabIndex = index),
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.collections_bookmark),
@@ -62,6 +65,10 @@ class _HolovaultShellState extends State<HolovaultShell> {
           BottomNavigationBarItem(
             icon: Icon(Icons.show_chart),
             label: 'Value trend',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.emoji_events),
+            label: 'Best Returns',
           ),
         ],
       ),
