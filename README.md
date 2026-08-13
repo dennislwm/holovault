@@ -14,6 +14,8 @@ First run on a fresh checkout: [Maintainer setup](#maintainer-setup) (`flutter c
    - Requires a booted iOS simulator or connected device.
    - No simulator booted yet? Run `make boot-sim`.
    - No devices listed at all? Run `make status` -- it checks whether an iOS runtime is installed.
+   - Testing on a physical device without staying tethered to the Mac? Use `make run-release`
+     instead -- see [Physical device testing](#physical-device-testing) below.
 
 Day-to-day loop is 2 -> 3 -> 4; re-run 1 only when `pubspec.yaml` changes.
 
