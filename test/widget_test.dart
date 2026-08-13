@@ -630,6 +630,84 @@ void main() {
   );
 
   testWidgets(
+    'REQ-032: matching value and % of collection update as the search bar narrows the list',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          valueTotal: const Value(300),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-2',
+          name: 'Blastoise',
+          valueTotal: const Value(100),
+        ),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      // Both items match: value = 300+100 = 400.00, 100.0% of the whole
+      // collection (which is just these two items).
+      expect(find.text('\$400.00'), findsOneWidget);
+      expect(find.text('100.0%'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'char');
+      await tester.pumpAndSettle();
+
+      // Narrowed to Charizard only: value = 300.00, 75.0% of the 400.00 whole.
+      expect(find.text('\$300.00'), findsOneWidget);
+      expect(find.text('75.0%'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  test(
+    'REQ-032: collectionDistribution()\'s three buckets are exhaustive -- '
+    'summing them equals the sum over every item, including items with a '
+    'rarity/gradeType combination outside the "obvious" Sealed/Ungraded cases',
+    () {
+      final items = [
+        CollectionItem(
+          id: 1,
+          importedId: '1',
+          name: 'A',
+          rarity: 'Sealed',
+          valueTotal: 10,
+        ),
+        CollectionItem(
+          id: 2,
+          importedId: '2',
+          name: 'B',
+          gradeType: 'Ungraded',
+          valueTotal: 20,
+        ),
+        CollectionItem(
+          id: 3,
+          importedId: '3',
+          name: 'C',
+          gradeType: 'PSA',
+          valueTotal: 30,
+        ),
+        // Neither rarity nor gradeType set at all -- still falls into the
+        // unconditional final "Graded" branch, not skipped.
+        CollectionItem(id: 4, importedId: '4', name: 'D', valueTotal: 40),
+      ];
+
+      final bucketSum = collectionDistribution(
+        items,
+      ).values.fold(0.0, (sum, v) => sum + v);
+      final directSum = items.fold(0.0, (sum, i) => sum + (i.valueTotal ?? 0));
+
+      expect(bucketSum, directSum);
+      expect(bucketSum, 100);
+    },
+  );
+
+  testWidgets(
     'REQ-030: adding a clause via the bottom sheet narrows the item list',
     (WidgetTester tester) async {
       await db.upsertItem(

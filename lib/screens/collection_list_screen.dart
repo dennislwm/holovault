@@ -119,6 +119,14 @@ String schemaErrorMessage(Object? error) {
 /// Derivation confirmed against real data (see ADR-17 Decision Drivers):
 /// `rarity == 'Sealed'` -> Sealed; else `gradeType == 'Ungraded'` ->
 /// Ungraded; else -> Graded. Sums `valueTotal`, treating a null total as 0.
+///
+/// REQ-032: the three buckets are exhaustive by construction -- the
+/// ternary chain's final branch is an unconditional `-> Graded`, not a
+/// null/skip case, so every item lands in exactly one bucket regardless
+/// of its `rarity`/`gradeType` values. Summing all three bucket totals
+/// therefore equals the sum over every item, making this function safe
+/// to reuse for a whole-list total (REQ-032's matching-value/percentage),
+/// not just the three-way distribution card it was originally written for.
 Map<String, double> collectionDistribution(List<CollectionItem> items) {
   final totals = {'Sealed': 0.0, 'Graded': 0.0, 'Ungraded': 0.0};
   for (final item in items) {
@@ -400,11 +408,25 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
           );
         }
         if (index == 3) {
+          final matchingValue = collectionDistribution(_filtered).values.fold(
+            0.0,
+            (sum, v) => sum + v,
+          );
+          final totalValue = collectionDistribution(widget.items).values.fold(
+            0.0,
+            (sum, v) => sum + v,
+          );
+          final pct = totalValue == 0 ? 0.0 : matchingValue / totalValue * 100;
+          final style = Theme.of(context).textTheme.labelSmall;
           return Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: Text(
-              '${_filtered.length} matching items',
-              style: Theme.of(context).textTheme.labelSmall,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('${_filtered.length} matching items', style: style),
+                Text('\$${matchingValue.toStringAsFixed(2)}', style: style),
+                Text('${pct.toStringAsFixed(1)}%', style: style),
+              ],
             ),
           );
         }
