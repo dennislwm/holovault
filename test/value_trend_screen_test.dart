@@ -353,6 +353,61 @@ void main() {
   );
 
   testWidgets(
+    'REQ-021: a dated item with no valueTotal/paidTotal appears on the x-axis '
+        'and contributes 0 to both running totals',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          valueTotal: const Value(100.0),
+          paidTotal: const Value(80.0),
+          dateAdded: Value(DateTime(2026, 1, 1)),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-2',
+          name: 'Undated-value Pikachu',
+          dateAdded: Value(DateTime(2026, 2, 1)),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-3',
+          name: 'Blastoise',
+          valueTotal: const Value(50.0),
+          paidTotal: const Value(40.0),
+          dateAdded: Value(DateTime(2026, 3, 1)),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ValueTrendScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      // All three appear -- the middle item's missing valueTotal/paidTotal
+      // does not exclude it from the x-axis now that withDates only
+      // requires dateAdded (REQ-020 widened the filter).
+      expect(find.text('Matching items · 3'), findsOneWidget);
+      expect(find.text('Undated-value Pikachu'), findsOneWidget);
+
+      // Running totals: the middle item contributes 0 to each, so the
+      // final total is just the two dated-and-valued items summed.
+      expect(
+        tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
+        '150.00',
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('value-trend-paid-total'))).data,
+        'Paid: 120.00',
+      );
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
     'REQ-023: Rarity=Sealed + Exclude sealed together yield zero matching items',
     (WidgetTester tester) async {
       await db.upsertItem(
