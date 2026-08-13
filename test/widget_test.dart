@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/database/database.dart';
 import 'package:holovault/main.dart';
 import 'package:holovault/screens/collection_list_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ponytail: drift's StreamBuilder-backed watch() query schedules a
 // zero-duration cleanup Timer on unmount (StreamQueryStore.markAsClosed).
@@ -23,6 +24,11 @@ void main() {
 
   setUp(() {
     db = AppDatabase.withExecutor(NativeDatabase.memory());
+    // ADR-15: ValueTrendScreen now mounts eagerly alongside
+    // CollectionListScreen inside HolovaultShell's IndexedStack, so its
+    // SharedPreferences.getInstance() call runs even on tests that only
+    // ever look at the Collection tab.
+    SharedPreferences.setMockInitialValues({});
   });
 
   tearDown(() async {
@@ -37,6 +43,58 @@ void main() {
 
     await disposeAndFlush(tester);
   });
+
+  testWidgets(
+    'REQ-027: switching tabs preserves ValueTrendScreen filter state '
+    'instead of resetting it',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          rarity: const Value('Holo'),
+          valueTotal: const Value(100.0),
+          dateAdded: Value(DateTime(2026, 1, 1)),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-2',
+          name: 'Blastoise',
+          rarity: const Value('Common'),
+          valueTotal: const Value(50.0),
+          dateAdded: Value(DateTime(2026, 2, 1)),
+        ),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BottomNavigationBar), findsOneWidget);
+      expect(find.text('Charizard'), findsOneWidget);
+
+      await tester.tap(find.text('Value trend'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rarity: All'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Holo').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Matching items · 1'), findsOneWidget);
+
+      // Switch to Collection, then back to Value trend -- with a pushed
+      // AppBar/Navigator.push this would rebuild the screen from scratch
+      // and reset the filter; IndexedStack keeps it mounted instead.
+      await tester.tap(find.text('Collection'));
+      await tester.pumpAndSettle();
+      expect(find.text('Charizard'), findsOneWidget);
+
+      await tester.tap(find.text('Value trend'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rarity: Holo'), findsOneWidget);
+      expect(find.text('Matching items · 1'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
 
   test(
     'REQ-018: schemaErrorMessage names UnsupportedSchemaVersionException '

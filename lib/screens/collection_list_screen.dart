@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import '../database/database.dart';
 import '../import_schema.dart';
 import 'item_detail_screen.dart';
-import 'value_trend_screen.dart';
 
 /// ADR-06, Option A: acquires a file path via the native document picker.
 /// Scope note (ADR-06): acquisition only -- parsing the picked file into
@@ -185,15 +184,6 @@ class CollectionListScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Collection'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.show_chart),
-            tooltip: 'Value trend',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ValueTrendScreen(database: database),
-              ),
-            ),
-          ),
           IconButton(
             icon: const Icon(Icons.file_upload),
             tooltip: 'Import',
