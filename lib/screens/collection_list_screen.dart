@@ -354,7 +354,7 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      itemCount: _filtered.length + 3,
+      itemCount: _filtered.length + 4,
       itemBuilder: (context, index) {
         if (index == 0) {
           return CollectionDistributionCard(items: widget.items);
@@ -399,7 +399,16 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
             ),
           );
         }
-        final item = _filtered[index - 3];
+        if (index == 3) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: Text(
+              '${_filtered.length} matching items',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          );
+        }
+        final item = _filtered[index - 4];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
@@ -419,7 +428,7 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
                 builder: (_) => ItemDetailScreen(
                   database: widget.database,
                   items: _filtered,
-                  initialIndex: index - 3,
+                  initialIndex: index - 4,
                 ),
               ),
             ),

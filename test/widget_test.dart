@@ -607,6 +607,29 @@ void main() {
   );
 
   testWidgets(
+    'REQ-031: match-count line updates as the search bar narrows the list',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Blastoise'),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 matching items'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'char');
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 matching items'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
     'REQ-030: adding a clause via the bottom sheet narrows the item list',
     (WidgetTester tester) async {
       await db.upsertItem(
