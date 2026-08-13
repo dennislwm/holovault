@@ -1,0 +1,151 @@
+import 'package:local_query_filter/local_query_filter.dart';
+
+import 'database/database.dart';
+
+/// ADR-18, Option 2: fields an ad hoc clause can target.
+enum SearchField {
+  value('Value'),
+  paid('Paid'),
+  quantity('Quantity'),
+  daysHeld('Days held'),
+  rarity('Rarity'),
+  gradeType('Grade type'),
+  setName('Set name');
+
+  const SearchField(this.label);
+  final String label;
+
+  bool get isText => this == rarity || this == gradeType || this == setName;
+}
+
+enum SearchOperator {
+  equal('='),
+  notEqual('!='),
+  greaterThan('>'),
+  greaterThanOrEqual('>='),
+  lessThan('<'),
+  lessThanOrEqual('<=');
+
+  const SearchOperator(this.symbol);
+  final String symbol;
+}
+
+/// Text fields only support equal/notEqual -- a `>`/`<` reading on a
+/// string field (per real column collation) is not something ADR-18
+/// exposes to the picker.
+List<SearchOperator> operatorsFor(SearchField field) =>
+    field.isText
+        ? const [SearchOperator.equal, SearchOperator.notEqual]
+        : SearchOperator.values;
+
+class SearchClause {
+  const SearchClause({required this.field, required this.op, required this.value});
+  final SearchField field;
+  final SearchOperator op;
+  final String value;
+}
+
+int? _daysHeld(CollectionItem item, DateTime now) {
+  final added = item.dateAdded;
+  return added == null ? null : now.difference(added).inDays;
+}
+
+num? _numericFieldValue(CollectionItem item, SearchField field, DateTime now) {
+  switch (field) {
+    case SearchField.value:
+      return item.valueTotal;
+    case SearchField.paid:
+      return item.paidTotal;
+    case SearchField.quantity:
+      return item.quantity;
+    case SearchField.daysHeld:
+      return _daysHeld(item, now);
+    case SearchField.rarity:
+    case SearchField.gradeType:
+    case SearchField.setName:
+      return null;
+  }
+}
+
+String? textFieldValue(CollectionItem item, SearchField field) {
+  switch (field) {
+    case SearchField.rarity:
+      return item.rarity;
+    case SearchField.gradeType:
+      return item.gradeType;
+    case SearchField.setName:
+      return item.setName;
+    case SearchField.value:
+    case SearchField.paid:
+    case SearchField.quantity:
+    case SearchField.daysHeld:
+      return null;
+  }
+}
+
+bool _matchesClause(CollectionItem item, SearchClause clause, DateTime now) {
+  if (clause.field.isText) {
+    final actual = textFieldValue(item, clause.field);
+    if (actual == null) return false;
+    return clause.op == SearchOperator.notEqual
+        ? actual != clause.value
+        : actual == clause.value;
+  }
+  final actual = _numericFieldValue(item, clause.field, now);
+  final target = num.tryParse(clause.value);
+  if (actual == null || target == null) return false;
+  switch (clause.op) {
+    case SearchOperator.equal:
+      return actual == target;
+    case SearchOperator.notEqual:
+      return actual != target;
+    case SearchOperator.greaterThan:
+      return actual > target;
+    case SearchOperator.greaterThanOrEqual:
+      return actual >= target;
+    case SearchOperator.lessThan:
+      return actual < target;
+    case SearchOperator.lessThanOrEqual:
+      return actual <= target;
+  }
+}
+
+/// ADR-18: search text and every clause narrow together (AND). Wraps
+/// each clause as a [CustomConstraint] rather than [ComparisonConstraint]
+/// so a null field value (an unset paidTotal/dateAdded/etc.) is handled
+/// explicitly -- it never matches any clause, not even `!=`.
+Future<List<CollectionItem>> filterCollectionItems(
+  List<CollectionItem> items, {
+  required String searchTerm,
+  required List<SearchClause> clauses,
+  DateTime? now,
+}) {
+  final today = now ?? DateTime.now();
+  final filter = QueryFilter<CollectionItem>(
+    ascending: true,
+    searchTerm: searchTerm,
+    constraints: [
+      for (final clause in clauses)
+        CustomConstraint<CollectionItem>(
+          customComparator: (item) => _matchesClause(item, clause, today),
+        ),
+    ],
+    searchFieldsExtractor: (item) => [
+      item.name,
+      if (item.setName != null) item.setName!,
+    ],
+  );
+  return filter.applyFilterAndSort(items);
+}
+
+/// ADR-18: real distinct values for a text field, scoped to [narrowed] --
+/// the items still matching every clause already added -- so the value
+/// picker never offers a choice that would already yield zero results.
+List<String> distinctValuesFor(SearchField field, List<CollectionItem> narrowed) {
+  final values = <String>{};
+  for (final item in narrowed) {
+    final v = textFieldValue(item, field);
+    if (v != null && v.isNotEmpty) values.add(v);
+  }
+  return values.toList()..sort();
+}

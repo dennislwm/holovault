@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../collection_search.dart';
 import '../database/database.dart';
 import '../import_schema.dart';
 import 'item_detail_screen.dart';
@@ -292,42 +293,244 @@ class CollectionListScreen extends StatelessWidget {
           if (items.isEmpty) {
             return const Center(child: Text('No items yet'));
           }
-          return ListView.builder(
-            itemCount: items.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return CollectionDistributionCard(items: items);
-              }
-              final item = items[index - 1];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                  child: Text(
-                    item.name.isEmpty ? '?' : item.name[0].toUpperCase(),
-                  ),
-                ),
-                title: Text(item.name),
-                subtitle: item.extra == null ? null : Text(item.extra!),
-                trailing: item.quantity == null
-                    ? null
-                    : Chip(label: Text('×${item.quantity}')),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ItemDetailScreen(
-                        database: database,
-                        items: items,
-                        initialIndex: index - 1,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
+          return _FilterableCollectionList(database: database, items: items);
         },
       ),
     );
   }
+}
+
+/// ADR-18, Option 2: below [CollectionDistributionCard] (unaffected by
+/// filtering -- it always summarizes the whole collection), a free-text
+/// search input plus an addable/removable structured clause builder,
+/// narrowing the item list below. Search and clauses narrow together
+/// (AND) via [filterCollectionItems].
+class _FilterableCollectionList extends StatefulWidget {
+  const _FilterableCollectionList({required this.database, required this.items});
+
+  final AppDatabase database;
+  final List<CollectionItem> items;
+
+  @override
+  State<_FilterableCollectionList> createState() => _FilterableCollectionListState();
+}
+
+class _FilterableCollectionListState extends State<_FilterableCollectionList> {
+  String _searchTerm = '';
+  final List<SearchClause> _clauses = [];
+  List<CollectionItem> _filtered = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _recompute();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FilterableCollectionList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.items != widget.items) _recompute();
+  }
+
+  Future<void> _recompute() async {
+    final result = await filterCollectionItems(
+      widget.items,
+      searchTerm: _searchTerm,
+      clauses: _clauses,
+    );
+    if (mounted) setState(() => _filtered = result);
+  }
+
+  void _addClause(SearchClause clause) {
+    setState(() => _clauses.add(clause));
+    _recompute();
+  }
+
+  void _removeClause(int index) {
+    setState(() => _clauses.removeAt(index));
+    _recompute();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: _filtered.length + 3,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return CollectionDistributionCard(items: widget.items);
+        }
+        if (index == 1) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'Search',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                _searchTerm = value;
+                _recompute();
+              },
+            ),
+          );
+        }
+        if (index == 2) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var i = 0; i < _clauses.length; i++)
+                  InputChip(
+                    label: Text(
+                      '${_clauses[i].field.label} ${_clauses[i].op.symbol} ${_clauses[i].value}',
+                    ),
+                    onDeleted: () => _removeClause(i),
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.add, size: 18),
+                  label: const Text('Add clause'),
+                  onPressed: () => _showAddClauseSheet(context, _filtered, _addClause),
+                ),
+              ],
+            ),
+          );
+        }
+        final item = _filtered[index - 3];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              child: Text(
+                item.name.isEmpty ? '?' : item.name[0].toUpperCase(),
+              ),
+            ),
+            title: Text(item.name),
+            subtitle: item.extra == null ? null : Text(item.extra!),
+            trailing: item.quantity == null
+                ? null
+                : Chip(label: Text('×${item.quantity}')),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ItemDetailScreen(
+                  database: widget.database,
+                  items: _filtered,
+                  initialIndex: index - 3,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// ADR-18, Option 2: sequential picker -- field, then an operator
+/// dropdown scoped to that field's type, then the value last (a number
+/// field for numeric/date fields, a dropdown of real distinct values,
+/// narrowed by [narrowed], for text fields).
+void _showAddClauseSheet(
+  BuildContext context,
+  List<CollectionItem> narrowed,
+  void Function(SearchClause) onAdd,
+) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) {
+      SearchField? field;
+      SearchOperator? op;
+      final valueController = TextEditingController();
+      String? textValue;
+
+      return StatefulBuilder(
+        builder: (context, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Add clause', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<SearchField>(
+                  initialValue: field,
+                  decoration: const InputDecoration(labelText: 'Field'),
+                  items: [
+                    for (final f in SearchField.values)
+                      DropdownMenuItem(value: f, child: Text(f.label)),
+                  ],
+                  onChanged: (value) => setSheetState(() {
+                    field = value;
+                    op = null;
+                    textValue = null;
+                    valueController.clear();
+                  }),
+                ),
+                if (field != null) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<SearchOperator>(
+                    initialValue: op,
+                    decoration: const InputDecoration(labelText: 'Operator'),
+                    items: [
+                      for (final o in operatorsFor(field!))
+                        DropdownMenuItem(value: o, child: Text(o.symbol)),
+                    ],
+                    onChanged: (value) => setSheetState(() => op = value),
+                  ),
+                ],
+                if (field != null && op != null) ...[
+                  const SizedBox(height: 12),
+                  if (field!.isText)
+                    DropdownButtonFormField<String>(
+                      initialValue: textValue,
+                      decoration: const InputDecoration(labelText: 'Value'),
+                      items: [
+                        for (final v in distinctValuesFor(field!, narrowed))
+                          DropdownMenuItem(value: v, child: Text(v)),
+                      ],
+                      onChanged: (value) => setSheetState(() => textValue = value),
+                    )
+                  else
+                    TextField(
+                      controller: valueController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Value'),
+                      onChanged: (_) => setSheetState(() {}),
+                    ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: field == null || op == null
+                      || (field!.isText ? textValue == null : valueController.text.isEmpty)
+                      ? null
+                      : () {
+                          onAdd(
+                            SearchClause(
+                              field: field!,
+                              op: op!,
+                              value: field!.isText ? textValue! : valueController.text,
+                            ),
+                          );
+                          Navigator.of(context).pop();
+                        },
+                  child: const Text('Add'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
 }

@@ -448,6 +448,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  local_query_filter:
+    dependency: "direct main"
+    description:
+      name: local_query_filter
+      sha256: "3f58bbb038d20fa0d37e99418ed4fda98edd7af5b12c3f5af2a2f79bf8d80b6e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   logging:
     dependency: transitive
     description:

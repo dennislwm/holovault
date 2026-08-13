@@ -581,6 +581,80 @@ void main() {
     },
   );
 
+  testWidgets(
+    'REQ-030: typing in the search bar narrows the item list',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Blastoise'),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Charizard'), findsOneWidget);
+      expect(find.text('Blastoise'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField).first, 'char');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Charizard'), findsOneWidget);
+      expect(find.text('Blastoise'), findsNothing);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-030: adding a clause via the bottom sheet narrows the item list',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Booster Box',
+          rarity: const Value('Sealed'),
+        ),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-2',
+          name: 'Charizard ex',
+          rarity: const Value('Holo'),
+        ),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Add clause'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Field'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rarity').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Operator'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('=').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Value'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sealed').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Booster Box'), findsOneWidget);
+      expect(find.text('Charizard ex'), findsNothing);
+      expect(find.text('Rarity = Sealed'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
   testWidgets('import button shows cancelled when the picker returns null', (
     WidgetTester tester,
   ) async {
