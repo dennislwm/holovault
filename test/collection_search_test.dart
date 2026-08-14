@@ -111,6 +111,36 @@ void main() {
     expect(result.single.rarity, 'Sealed');
   });
 
+  test('REQ-035: a paidPerUnit clause compares per-unit, not the paidTotal', () async {
+    await db.upsertItem(
+      CollectionItemsCompanion.insert(
+        importedId: '1',
+        name: 'Cheap per unit, high total',
+        paidPerUnit: const Value(5),
+        paidTotal: const Value(500),
+      ),
+    );
+    await db.upsertItem(
+      CollectionItemsCompanion.insert(
+        importedId: '2',
+        name: 'Pricey per unit',
+        paidPerUnit: const Value(50),
+        paidTotal: const Value(50),
+      ),
+    );
+    final items = await db.select(db.collectionItems).get();
+
+    final result = await filterCollectionItems(
+      items,
+      searchTerm: '',
+      clauses: const [
+        SearchClause(field: SearchField.paidPerUnit, op: SearchOperator.greaterThan, value: '10'),
+      ],
+    );
+
+    expect(result.map((i) => i.name), ['Pricey per unit']);
+  });
+
   test('REQ-030: distinctValuesFor returns sorted, deduplicated real values', () async {
     await db.upsertItem(
       CollectionItemsCompanion.insert(importedId: '1', name: 'A', rarity: const Value('Sealed')),

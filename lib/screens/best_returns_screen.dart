@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../annualized_return.dart';
@@ -7,23 +6,19 @@ import '../database/database.dart';
 import '../widgets/search_filter_bar.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
 
-const _minPaidKey = 'best_returns_min_paid';
-const _maxValueKey = 'best_returns_max_value';
-const _minDaysKey = 'best_returns_min_days';
 const _limitKey = 'best_returns_limit';
 
-const _defaultMinPaid = 0.0;
-const _defaultMaxValue = 100000.0;
-const _defaultMinDays = 90;
 const _defaultLimit = 5;
 
 /// ADR-16 (superseded by ADR-19), ADR-19 Option 1: ranks collection items by
 /// annualized return (CAGR) in a sortable DataTable whose "Return" column
 /// combines a proportional-width bar with its percent text in one DataCell.
-/// Filtering is now the shared [SearchFilterBar] (search term + clause
+/// Filtering is the shared [SearchFilterBar] (search term + clause
 /// builder), same as [ValueTrendScreen]/[CollectionListScreen]; `limit`
 /// stays this screen's own post-rank `Stepper`, out of ADR-19's scope
-/// (truncation, not a filter criterion).
+/// (truncation, not a filter criterion). REQ-035: `min_paid`/`max_value`/
+/// `min_days` (ADR-16) are gone -- the clause builder's `paidPerUnit`/
+/// `valuePerUnit`/`daysHeld` fields fully subsume them.
 class BestReturnsScreen extends StatefulWidget {
   const BestReturnsScreen({super.key, required this.database});
 
@@ -39,50 +34,27 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
   // risk from SearchFilterBar's onFiltered callback setState()ing this
   // State.
   late final Stream<List<CollectionItem>> _itemsStream = widget.database.watchAllItems();
-  double _minPaid = _defaultMinPaid;
-  double _maxValue = _defaultMaxValue;
-  int _minDays = _defaultMinDays;
   int _limit = _defaultLimit;
   bool _loadedPersisted = false;
   int _sortColumnIndex = 1;
   bool _sortAscending = false;
 
-  late final TextEditingController _minPaidController;
-  late final TextEditingController _maxValueController;
-
   @override
   void initState() {
     super.initState();
-    _minPaidController = TextEditingController();
-    _maxValueController = TextEditingController();
     _loadPersisted();
-  }
-
-  @override
-  void dispose() {
-    _minPaidController.dispose();
-    _maxValueController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadPersisted() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _minPaid = prefs.getDouble(_minPaidKey) ?? _defaultMinPaid;
-      _maxValue = prefs.getDouble(_maxValueKey) ?? _defaultMaxValue;
-      _minDays = prefs.getInt(_minDaysKey) ?? _defaultMinDays;
       _limit = prefs.getInt(_limitKey) ?? _defaultLimit;
-      _minPaidController.text = _minPaid.toStringAsFixed(2);
-      _maxValueController.text = _maxValue.toStringAsFixed(2);
       _loadedPersisted = true;
     });
   }
 
   Future<void> _saveParams() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_minPaidKey, _minPaid);
-    await prefs.setDouble(_maxValueKey, _maxValue);
-    await prefs.setInt(_minDaysKey, _minDays);
     await prefs.setInt(_limitKey, _limit);
   }
 
@@ -126,13 +98,7 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
           }
           final allItems = snapshot.data ?? const [];
 
-          final ranked = computeAnnualizedReturns(
-            _filtered,
-            minPaid: _minPaid,
-            maxValue: _maxValue,
-            minDays: _minDays,
-            limit: _limit,
-          );
+          final ranked = computeAnnualizedReturns(_filtered, limit: _limit);
           // Re-apply the user's chosen sort (default: Return descending,
           // matching computeAnnualizedReturns' own default order) on top
           // of the already-filtered/limited ranked list.
@@ -171,65 +137,6 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
-                    width: 90,
-                    child: TextField(
-                      key: const Key('best-returns-min-paid'),
-                      controller: _minPaidController,
-                      decoration: const InputDecoration(labelText: 'Min paid'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
-                      // Recomputes on submit/blur, not onChanged -- onChanged
-                      // fires per keystroke, so typing "180" would recompute
-                      // against "1" and "18" first (ADR-16 Decision Drivers).
-                      onSubmitted: (v) {
-                        setState(() => _minPaid = double.tryParse(v) ?? _defaultMinPaid);
-                        _saveParams();
-                      },
-                    ),
-                  ),
-                  SizedBox(
-                    width: 90,
-                    child: TextField(
-                      key: const Key('best-returns-max-value'),
-                      controller: _maxValueController,
-                      decoration: const InputDecoration(labelText: 'Max value'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
-                      onSubmitted: (v) {
-                        setState(() => _maxValue = double.tryParse(v) ?? _defaultMaxValue);
-                        _saveParams();
-                      },
-                    ),
-                  ),
-                  SizedBox(
-                    width: 160,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Min days: $_minDays', style: Theme.of(context).textTheme.bodySmall),
-                        Slider(
-                          key: const Key('best-returns-min-days'),
-                          value: _minDays.toDouble(),
-                          min: 0,
-                          max: 365,
-                          divisions: 73,
-                          label: '$_minDays',
-                          // onChangeEnd (not onChanged) -- avoids recomputing
-                          // on every pixel of drag (ADR-16 Decision Drivers).
-                          onChanged: (v) => setState(() => _minDays = v.round()),
-                          onChangeEnd: (v) {
-                            setState(() => _minDays = v.round());
-                            _saveParams();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

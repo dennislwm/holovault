@@ -6,6 +6,8 @@ import 'database/database.dart';
 enum SearchField {
   value('Value'),
   paid('Paid'),
+  valuePerUnit('Value/unit'),
+  paidPerUnit('Paid/unit'),
   quantity('Quantity'),
   daysHeld('Days held'),
   rarity('Rarity'),
@@ -71,6 +73,10 @@ num? _numericFieldValue(CollectionItem item, SearchField field, DateTime now) {
       return item.valueTotal;
     case SearchField.paid:
       return item.paidTotal;
+    case SearchField.valuePerUnit:
+      return item.valuePerUnit;
+    case SearchField.paidPerUnit:
+      return item.paidPerUnit;
     case SearchField.quantity:
       return item.quantity;
     case SearchField.daysHeld:
@@ -92,6 +98,8 @@ String? textFieldValue(CollectionItem item, SearchField field) {
       return item.setName;
     case SearchField.value:
     case SearchField.paid:
+    case SearchField.valuePerUnit:
+    case SearchField.paidPerUnit:
     case SearchField.quantity:
     case SearchField.daysHeld:
       return null;

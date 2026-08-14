@@ -36,14 +36,7 @@ void main() {
     );
     final items = await db.select(db.collectionItems).get();
 
-    final ranked = computeAnnualizedReturns(
-      items,
-      minPaid: 0,
-      maxValue: null,
-      minDays: 0,
-      limit: 10,
-      now: DateTime(2026, 1, 1),
-    );
+    final ranked = computeAnnualizedReturns(items, limit: 10, now: DateTime(2026, 1, 1));
 
     expect(ranked, hasLength(2));
     expect(ranked.first.item.name, 'Fast grower');
@@ -60,71 +53,7 @@ void main() {
     );
     final items = await db.select(db.collectionItems).get();
 
-    final ranked = computeAnnualizedReturns(
-      items,
-      minPaid: 0,
-      maxValue: null,
-      minDays: 0,
-      limit: 10,
-      now: DateTime(2026, 1, 1),
-    );
-
-    expect(ranked, isEmpty);
-  });
-
-  test('excludes an item below minPaid or above maxValue', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: 'card-1',
-        name: 'Cheap',
-        paidPerUnit: const Value(1.0),
-        valuePerUnit: const Value(2.0),
-        dateAdded: Value(DateTime(2025, 1, 1)),
-      ),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: 'card-2',
-        name: 'Expensive',
-        paidPerUnit: const Value(500.0),
-        valuePerUnit: const Value(600.0),
-        dateAdded: Value(DateTime(2025, 1, 1)),
-      ),
-    );
-    final items = await db.select(db.collectionItems).get();
-
-    final ranked = computeAnnualizedReturns(
-      items,
-      minPaid: 10,
-      maxValue: 500,
-      minDays: 0,
-      limit: 10,
-      now: DateTime(2026, 1, 1),
-    );
-
-    expect(ranked, isEmpty);
-  });
-
-  test('excludes an item held fewer days than minDays', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: 'card-1',
-        name: 'Just added',
-        paidPerUnit: const Value(10.0),
-        valuePerUnit: const Value(20.0),
-        dateAdded: Value(DateTime(2025, 12, 30)),
-      ),
-    );
-    final items = await db.select(db.collectionItems).get();
-
-    final ranked = computeAnnualizedReturns(
-      items,
-      minPaid: 0,
-      maxValue: null,
-      minDays: 90,
-      limit: 10,
-      now: DateTime(2026, 1, 1),
-    );
+    final ranked = computeAnnualizedReturns(items, limit: 10, now: DateTime(2026, 1, 1));
 
     expect(ranked, isEmpty);
   });
@@ -143,14 +72,7 @@ void main() {
     }
     final items = await db.select(db.collectionItems).get();
 
-    final ranked = computeAnnualizedReturns(
-      items,
-      minPaid: 0,
-      maxValue: null,
-      minDays: 0,
-      limit: 2,
-      now: DateTime(2026, 1, 1),
-    );
+    final ranked = computeAnnualizedReturns(items, limit: 2, now: DateTime(2026, 1, 1));
 
     expect(ranked, hasLength(2));
   });

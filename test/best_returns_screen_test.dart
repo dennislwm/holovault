@@ -134,56 +134,6 @@ void main() {
   );
 
   testWidgets(
-    'REQ-028: min paid param excludes items at or below the threshold, persists on submit',
-    (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Cheap',
-          paidPerUnit: const Value(1.0),
-          valuePerUnit: const Value(2.0),
-          dateAdded: Value(DateTime.now().subtract(const Duration(days: 200))),
-        ),
-      );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-2',
-          name: 'Pricier',
-          paidPerUnit: const Value(50.0),
-          valuePerUnit: const Value(80.0),
-          dateAdded: Value(DateTime.now().subtract(const Duration(days: 200))),
-        ),
-      );
-      await tester.pumpWidget(
-        MaterialApp(home: BestReturnsScreen(database: db)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Ranked · 2'), findsOneWidget);
-
-      await tester.enterText(find.byKey(const Key('best-returns-min-paid')), '10');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Ranked · 1'), findsOneWidget);
-      expect(find.text('Pricier'), findsOneWidget);
-      expect(find.text('Cheap'), findsNothing);
-
-      await disposeAndFlush(tester);
-
-      // Fresh screen instance -- min paid should still be 10.
-      await tester.pumpWidget(
-        MaterialApp(home: BestReturnsScreen(database: db)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Ranked · 1'), findsOneWidget);
-
-      await disposeAndFlush(tester);
-    },
-  );
-
-  testWidgets(
     'REQ-028: limit stepper truncates the ranked list',
     (WidgetTester tester) async {
       for (var i = 0; i < 3; i++) {

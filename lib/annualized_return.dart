@@ -21,14 +21,12 @@ class AnnualizedReturn {
 /// Dart terms: holovault's valuePerUnit/paidPerUnit are already typed
 /// REAL (REQ-012 already resolves the "Unavailable" sentinel to null at
 /// import time), so this needs a null-check only, not pyholofoil's
-/// TEXT-guard clauses. `minPaid`/`maxValue`/`minDays` mirror pyholofoil's
-/// `:min_paid`/`:max_value`/`:min_days` bind params -- exclusive bounds,
-/// matching pyholofoil's own `>`/`<` (not `>=`/`<=`).
+/// TEXT-guard clauses. REQ-035: the `minPaid`/`maxValue`/`minDays`
+/// thresholds this function used to apply are now the clause builder's
+/// job (`SearchField.paidPerUnit`/`.valuePerUnit`/`.daysHeld`) -- this
+/// function only computes the ranking, on whatever's already filtered.
 List<AnnualizedReturn> computeAnnualizedReturns(
   List<CollectionItem> items, {
-  required double minPaid,
-  required double? maxValue,
-  required int minDays,
   required int limit,
   DateTime? now,
 }) {
@@ -38,12 +36,11 @@ List<AnnualizedReturn> computeAnnualizedReturns(
     final paid = item.paidPerUnit;
     final value = item.valuePerUnit;
     final dateAdded = item.dateAdded;
-    if (paid == null || paid <= minPaid) continue;
+    if (paid == null || paid <= 0) continue;
     if (value == null) continue;
-    if (maxValue != null && value >= maxValue) continue;
     if (dateAdded == null) continue;
     final days = today.difference(dateAdded).inDays;
-    if (days <= minDays) continue;
+    if (days <= 0) continue;
     final percent = (pow(value / paid, 365.0 / days) - 1) * 100;
     results.add(
       AnnualizedReturn(item: item, daysHeld: days, percent: percent.toDouble()),
