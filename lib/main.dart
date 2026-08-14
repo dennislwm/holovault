@@ -1,3 +1,4 @@
+import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 
 import 'database/database.dart';
@@ -19,6 +20,11 @@ class HolovaultApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'holovault',
+      // ADR-21, Option 2: flex_color_scheme's ebonyClay scheme -- a visual
+      // match for the app's navy-blue-dominant logo with teal/green accents.
+      theme: FlexThemeData.light(scheme: FlexScheme.ebonyClay),
+      darkTheme: FlexThemeData.dark(scheme: FlexScheme.ebonyClay),
+      themeMode: ThemeMode.system,
       home: HolovaultShell(database: database),
     );
   }

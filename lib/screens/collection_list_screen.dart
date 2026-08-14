@@ -173,7 +173,7 @@ class CollectionDistributionCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(category, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text(category, style: Theme.of(context).textTheme.titleSmall),
                         Text(
                           grandTotal == 0
                               ? '\$${totals[category]!.toStringAsFixed(2)} · 0%'

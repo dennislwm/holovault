@@ -19,6 +19,7 @@ dependencies:
   fl_chart: ^1.2.0
   shared_preferences: ^2.5.5
   local_query_filter: ^1.0.0
+  flex_color_scheme: ^8.4.0
 
 dev_dependencies:
   flutter_test:

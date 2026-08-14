@@ -44,6 +44,22 @@ void main() {
     await disposeAndFlush(tester);
   });
 
+  testWidgets('REQ-040: app-wide theme is wired in, not Flutter\'s unstyled default',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(HolovaultApp(database: db));
+    await tester.pumpAndSettle();
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.theme, isNotNull);
+    expect(app.darkTheme, isNotNull);
+    // Default MaterialApp() with no theme: falls back to Colors.blue as the
+    // seed -- confirming the primary differs from that default is a cheap
+    // signal the ebonyClay scheme (not Flutter's own fallback) is applied.
+    expect(app.theme!.colorScheme.primary, isNot(Colors.blue));
+
+    await disposeAndFlush(tester);
+  });
+
   testWidgets(
     'REQ-027: switching tabs preserves ValueTrendScreen filter state '
     'instead of resetting it',
