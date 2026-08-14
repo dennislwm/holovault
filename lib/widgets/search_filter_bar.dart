@@ -32,6 +32,31 @@ class SearchFilterBar extends StatefulWidget {
   State<SearchFilterBar> createState() => SearchFilterBarState();
 }
 
+/// ADR-20, Option 1: a named, saved `{searchTerm, clauses}` snapshot a user
+/// can reapply later, distinct from [SearchFilterBarState]'s own single
+/// live state.
+class FilterPreset {
+  const FilterPreset({required this.name, required this.searchTerm, required this.clauses});
+
+  final String name;
+  final String searchTerm;
+  final List<SearchClause> clauses;
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'searchTerm': searchTerm,
+    'clauses': clauses.map((c) => c.toJson()).toList(),
+  };
+
+  factory FilterPreset.fromJson(Map<String, dynamic> json) => FilterPreset(
+    name: json['name'] as String,
+    searchTerm: json['searchTerm'] as String,
+    clauses: (json['clauses'] as List<dynamic>)
+        .map((e) => SearchClause.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
+}
+
 class SearchFilterBarState extends State<SearchFilterBar> {
   String _searchTerm = '';
   final List<SearchClause> _clauses = [];
@@ -41,9 +66,11 @@ class SearchFilterBarState extends State<SearchFilterBar> {
   // it's safe from the Element-destruction risk an uncontrolled TextField
   // would otherwise carry.
   final TextEditingController _searchController = TextEditingController();
+  final List<FilterPreset> _presets = [];
 
   String get _searchKey => '${widget.prefsKeyPrefix}_search';
   String get _clausesKey => '${widget.prefsKeyPrefix}_clauses';
+  String get _presetsKey => '${widget.prefsKeyPrefix}_presets';
 
   @override
   void initState() {
@@ -63,6 +90,13 @@ class SearchFilterBarState extends State<SearchFilterBar> {
         decoded.map((e) => SearchClause.fromJson(e as Map<String, dynamic>)),
       );
     }
+    final rawPresets = prefs.getString(_presetsKey);
+    if (rawPresets != null) {
+      final decoded = jsonDecode(rawPresets) as List<dynamic>;
+      _presets.addAll(
+        decoded.map((e) => FilterPreset.fromJson(e as Map<String, dynamic>)),
+      );
+    }
     await _recompute();
   }
 
@@ -73,6 +107,43 @@ class SearchFilterBarState extends State<SearchFilterBar> {
       _clausesKey,
       jsonEncode(_clauses.map((c) => c.toJson()).toList()),
     );
+  }
+
+  Future<void> _persistPresets() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _presetsKey,
+      jsonEncode(_presets.map((p) => p.toJson()).toList()),
+    );
+  }
+
+  /// Saving under an existing name replaces that entry -- idempotent by
+  /// name, never appends a duplicate.
+  void _savePreset(String name) {
+    setState(() {
+      _presets.removeWhere((p) => p.name == name);
+      _presets.add(
+        FilterPreset(name: name, searchTerm: _searchTerm, clauses: List.of(_clauses)),
+      );
+    });
+    _persistPresets();
+  }
+
+  void _applyPreset(FilterPreset preset) {
+    setState(() {
+      _searchTerm = preset.searchTerm;
+      _searchController.text = preset.searchTerm;
+      _clauses
+        ..clear()
+        ..addAll(preset.clauses);
+    });
+    _recompute();
+    _persist();
+  }
+
+  void _deletePreset(String name) {
+    setState(() => _presets.removeWhere((p) => p.name == name));
+    _persistPresets();
   }
 
   @override
@@ -118,21 +189,61 @@ class SearchFilterBarState extends State<SearchFilterBar> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-          child: TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Search',
-              isDense: true,
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (value) {
-              _searchTerm = value;
-              _recompute();
-              _persist();
-            },
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Search',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    _searchTerm = value;
+                    _recompute();
+                    _persist();
+                  },
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.save_outlined),
+                tooltip: 'Save as...',
+                onPressed: () => _showSaveAsDialog(context),
+              ),
+            ],
           ),
         ),
+        if (_presets.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+            child: DropdownButtonFormField<String>(
+              initialValue: null,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Presets', isDense: true),
+              items: [
+                for (final preset in _presets)
+                  DropdownMenuItem(
+                    value: preset.name,
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(preset.name, overflow: TextOverflow.ellipsis)),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          onPressed: () => _deletePreset(preset.name),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              onChanged: (name) {
+                if (name == null) return;
+                final preset = _presets.firstWhere((p) => p.name == name);
+                _applyPreset(preset);
+              },
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
           child: Wrap(
@@ -160,6 +271,40 @@ class SearchFilterBarState extends State<SearchFilterBar> {
         ),
       ],
     );
+  }
+
+  Future<void> _showSaveAsDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save as...'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Preset name'),
+          autofocus: true,
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) Navigator.of(context).pop(value.trim());
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ValueListenableBuilder(
+            valueListenable: controller,
+            builder: (context, value, _) => FilledButton(
+              onPressed: value.text.trim().isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(value.text.trim()),
+              child: const Text('Save'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) _savePreset(name);
   }
 }
 
