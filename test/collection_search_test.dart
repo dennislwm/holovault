@@ -141,6 +141,36 @@ void main() {
     expect(result.map((i) => i.name), ['Pricey per unit']);
   });
 
+  test('REQ-036: a valuePerUnit clause compares per-unit, not the valueTotal', () async {
+    await db.upsertItem(
+      CollectionItemsCompanion.insert(
+        importedId: '1',
+        name: 'Cheap per unit, high total',
+        valuePerUnit: const Value(5),
+        valueTotal: const Value(500),
+      ),
+    );
+    await db.upsertItem(
+      CollectionItemsCompanion.insert(
+        importedId: '2',
+        name: 'Pricey per unit',
+        valuePerUnit: const Value(50),
+        valueTotal: const Value(50),
+      ),
+    );
+    final items = await db.select(db.collectionItems).get();
+
+    final result = await filterCollectionItems(
+      items,
+      searchTerm: '',
+      clauses: const [
+        SearchClause(field: SearchField.valuePerUnit, op: SearchOperator.greaterThan, value: '10'),
+      ],
+    );
+
+    expect(result.map((i) => i.name), ['Pricey per unit']);
+  });
+
   test('REQ-030: distinctValuesFor returns sorted, deduplicated real values', () async {
     await db.upsertItem(
       CollectionItemsCompanion.insert(importedId: '1', name: 'A', rarity: const Value('Sealed')),
