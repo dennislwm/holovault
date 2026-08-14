@@ -123,4 +123,40 @@ void main() {
 
     await disposeAndFlush(tester);
   });
+
+  testWidgets(
+    'REQ-038: Add clause keeps the Field/Operator selection while the numeric '
+    'Value field is edited',
+    (WidgetTester tester) async {
+      await pump(tester);
+
+      await tester.tap(find.text('Add clause'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Field'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Days held').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Operator'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('>').last);
+      await tester.pumpAndSettle();
+
+      // Type into the numeric Value field across several rebuilds -- the
+      // reported (device-only) bug lost the Field/Operator selection here.
+      await tester.enterText(find.widgetWithText(TextField, 'Value'), '1');
+      await tester.pump();
+      await tester.enterText(find.widgetWithText(TextField, 'Value'), '10');
+      await tester.pump();
+
+      expect(find.text('Days held'), findsOneWidget);
+      expect(find.text('>'), findsWidgets);
+
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      await disposeAndFlush(tester);
+    },
+  );
 }

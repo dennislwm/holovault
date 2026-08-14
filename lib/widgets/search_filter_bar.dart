@@ -320,99 +320,122 @@ void showAddClauseSheet(
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) {
-      SearchField? field;
-      SearchOperator? op;
-      final valueController = TextEditingController();
-      String? textValue;
+    builder: (context) => _AddClauseSheet(narrowed: narrowed, onAdd: onAdd),
+  );
+}
 
-      return StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+/// REQ-038: was a `StatefulBuilder` closure over local variables --
+/// reported (device only, not reproducible in a widget test) to lose the
+/// field/operator selection when the numeric Value `TextField`'s keyboard
+/// takes focus. A real `StatefulWidget` gives this form its own `State`
+/// object instead of relying on an enclosing builder closure staying
+/// intact across every rebuild, removing that fragility class outright.
+class _AddClauseSheet extends StatefulWidget {
+  const _AddClauseSheet({required this.narrowed, required this.onAdd});
+
+  final List<CollectionItem> narrowed;
+  final void Function(SearchClause) onAdd;
+
+  @override
+  State<_AddClauseSheet> createState() => _AddClauseSheetState();
+}
+
+class _AddClauseSheetState extends State<_AddClauseSheet> {
+  SearchField? _field;
+  SearchOperator? _op;
+  String? _textValue;
+  final _valueController = TextEditingController();
+
+  @override
+  void dispose() {
+    _valueController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Add clause', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<SearchField>(
+            initialValue: _field,
+            decoration: const InputDecoration(labelText: 'Field'),
+            items: [
+              for (final f in SearchField.values)
+                DropdownMenuItem(value: f, child: Text(f.label)),
+            ],
+            onChanged: (value) => setState(() {
+              _field = value;
+              _op = null;
+              _textValue = null;
+              _valueController.clear();
+            }),
+          ),
+          if (_field != null) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<SearchOperator>(
+              initialValue: _op,
+              decoration: const InputDecoration(labelText: 'Operator'),
+              items: [
+                for (final o in operatorsFor(_field!))
+                  DropdownMenuItem(value: o, child: Text(o.symbol)),
+              ],
+              onChanged: (value) => setState(() => _op = value),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Add clause', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<SearchField>(
-                  initialValue: field,
-                  decoration: const InputDecoration(labelText: 'Field'),
-                  items: [
-                    for (final f in SearchField.values)
-                      DropdownMenuItem(value: f, child: Text(f.label)),
-                  ],
-                  onChanged: (value) => setSheetState(() {
-                    field = value;
-                    op = null;
-                    textValue = null;
-                    valueController.clear();
-                  }),
-                ),
-                if (field != null) ...[
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<SearchOperator>(
-                    initialValue: op,
-                    decoration: const InputDecoration(labelText: 'Operator'),
-                    items: [
-                      for (final o in operatorsFor(field!))
-                        DropdownMenuItem(value: o, child: Text(o.symbol)),
-                    ],
-                    onChanged: (value) => setSheetState(() => op = value),
-                  ),
-                ],
-                if (field != null && op != null) ...[
-                  const SizedBox(height: 12),
-                  if (field!.isText)
-                    DropdownButtonFormField<String>(
-                      initialValue: textValue,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Value'),
-                      items: [
-                        for (final v in distinctValuesFor(field!, narrowed))
-                          DropdownMenuItem(
-                            value: v,
-                            child: Text(v, overflow: TextOverflow.ellipsis),
-                          ),
-                      ],
-                      onChanged: (value) => setSheetState(() => textValue = value),
-                    )
-                  else
-                    TextField(
-                      controller: valueController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Value'),
-                      onChanged: (_) => setSheetState(() {}),
+          ],
+          if (_field != null && _op != null) ...[
+            const SizedBox(height: 12),
+            if (_field!.isText)
+              DropdownButtonFormField<String>(
+                initialValue: _textValue,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Value'),
+                items: [
+                  for (final v in distinctValuesFor(_field!, widget.narrowed))
+                    DropdownMenuItem(
+                      value: v,
+                      child: Text(v, overflow: TextOverflow.ellipsis),
                     ),
                 ],
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: field == null || op == null
-                      || (field!.isText ? textValue == null : valueController.text.isEmpty)
-                      ? null
-                      : () {
-                          onAdd(
-                            SearchClause(
-                              field: field!,
-                              op: op!,
-                              value: field!.isText ? textValue! : valueController.text,
-                            ),
-                          );
-                          Navigator.of(context).pop();
-                        },
-                  child: const Text('Add'),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
+                onChanged: (value) => setState(() => _textValue = value),
+              )
+            else
+              TextField(
+                controller: _valueController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Value'),
+                onChanged: (_) => setState(() {}),
+              ),
+          ],
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _field == null || _op == null
+                || (_field!.isText ? _textValue == null : _valueController.text.isEmpty)
+                ? null
+                : () {
+                    widget.onAdd(
+                      SearchClause(
+                        field: _field!,
+                        op: _op!,
+                        value: _field!.isText ? _textValue! : _valueController.text,
+                      ),
+                    );
+                    Navigator.of(context).pop();
+                  },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
 }
