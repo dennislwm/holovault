@@ -327,11 +327,27 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
   String _searchTerm = '';
   final List<SearchClause> _clauses = [];
   List<CollectionItem> _filtered = const [];
+  // REQ-033: owned here, not by the TextField itself. The search field sits
+  // at a fixed ListView.builder index; a prior widget test using
+  // ScrollPosition.jumpTo did not reproduce text loss there, so the precise
+  // trigger (list virtualization disposing the item's Element/State, vs.
+  // something else) is not confirmed. This fix does not depend on knowing
+  // which: an uncontrolled TextField's typed text lives in its own State,
+  // which is at risk if that Element is ever destroyed and rebuilt for any
+  // reason; this State object is the ListView's parent, never virtualized,
+  // so moving ownership here removes the risk regardless of cause.
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _recompute();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -371,6 +387,7 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
           return Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
             child: TextField(
+              controller: _searchController,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search),
                 hintText: 'Search',

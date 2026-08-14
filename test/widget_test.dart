@@ -773,4 +773,35 @@ void main() {
 
     await disposeAndFlush(tester);
   });
+
+  testWidgets(
+    'REQ-033: search text survives the field scrolling off-screen and back',
+    (WidgetTester tester) async {
+      for (var i = 0; i < 100; i++) {
+        await db.upsertItem(
+          CollectionItemsCompanion.insert(importedId: 'card-$i', name: 'Card $i'),
+        );
+      }
+      await tester.pumpWidget(
+        MaterialApp(home: CollectionListScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField).first, 'Charizard');
+      await tester.pump();
+
+      // ADR-18's search field sits at a fixed ListView.builder index, near
+      // the top; scrolling to the list end and back forces its list item
+      // off-screen past the sliver's cache extent and back again.
+      final listFinder = find.byType(ListView);
+      await tester.drag(listFinder, const Offset(0, -100000));
+      await tester.pumpAndSettle();
+      await tester.drag(listFinder, const Offset(0, 100000));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Charizard'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
 }
