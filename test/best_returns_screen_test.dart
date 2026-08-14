@@ -11,6 +11,38 @@ Future<void> disposeAndFlush(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 1));
 }
 
+/// REQ-034 (ADR-19): drives the shared clause-builder bottom sheet
+/// (`SearchFilterBar`'s `showAddClauseSheet`), same sequence as
+/// `widget_test.dart`'s "adding a clause via the bottom sheet" test --
+/// field, then operator, then value, then Add.
+Future<void> addClause(
+  WidgetTester tester, {
+  required String field,
+  required String op,
+  required String value,
+}) async {
+  await tester.tap(find.text('Add clause'));
+  await tester.pumpAndSettle();
+  // .last on each label -- the bottom sheet renders on top of (after) any
+  // same-named Text already in the screen behind it (e.g. BestReturnsScreen's
+  // "Value" DataColumn header), so the sheet's own label is always the last
+  // match in tree order.
+  await tester.tap(find.text('Field').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(field).last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Operator').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(op).last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Value').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(value).last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Add').last);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late AppDatabase db;
 
@@ -62,7 +94,7 @@ void main() {
   );
 
   testWidgets(
-    'REQ-028: filtering by set narrows the ranked list',
+    'REQ-028/REQ-034: filtering by a Set name clause narrows the ranked list',
     (WidgetTester tester) async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -91,10 +123,7 @@ void main() {
 
       expect(find.text('Ranked · 2'), findsOneWidget);
 
-      await tester.tap(find.text('Set: All'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Base Set').last);
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Set name', op: '=', value: 'Base Set');
 
       expect(find.text('Ranked · 1'), findsOneWidget);
       expect(find.text('In Base Set'), findsOneWidget);

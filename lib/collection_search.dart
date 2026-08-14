@@ -43,6 +43,21 @@ class SearchClause {
   final SearchField field;
   final SearchOperator op;
   final String value;
+
+  /// REQ-034 (ADR-19): `jsonEncode` can't serialize enum fields directly --
+  /// this explicit map conversion is the required step, per ADR-19's own
+  /// Decision Drivers.
+  Map<String, String> toJson() => {
+    'field': field.name,
+    'op': op.name,
+    'value': value,
+  };
+
+  factory SearchClause.fromJson(Map<String, dynamic> json) => SearchClause(
+    field: SearchField.values.byName(json['field'] as String),
+    op: SearchOperator.values.byName(json['op'] as String),
+    value: json['value'] as String,
+  );
 }
 
 int? _daysHeld(CollectionItem item, DateTime now) {

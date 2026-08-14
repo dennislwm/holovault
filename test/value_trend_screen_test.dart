@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -10,6 +12,38 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> disposeAndFlush(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox());
   await tester.pump(const Duration(milliseconds: 1));
+}
+
+/// REQ-034 (ADR-19): drives the shared clause-builder bottom sheet
+/// (`SearchFilterBar`'s `showAddClauseSheet`), same sequence as
+/// `widget_test.dart`'s "adding a clause via the bottom sheet" test --
+/// field, then operator, then value, then Add.
+Future<void> addClause(
+  WidgetTester tester, {
+  required String field,
+  required String op,
+  required String value,
+}) async {
+  await tester.tap(find.text('Add clause'));
+  await tester.pumpAndSettle();
+  // .last on each label -- the bottom sheet renders on top of (after) any
+  // same-named Text already in the screen behind it (e.g. BestReturnsScreen's
+  // "Value" DataColumn header), so the sheet's own label is always the last
+  // match in tree order.
+  await tester.tap(find.text('Field').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(field).last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Operator').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(op).last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Value').last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(value).last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Add').last);
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -66,7 +100,7 @@ void main() {
   );
 
   testWidgets(
-    'REQ-015: filtering by set narrows the chart total to matching items',
+    'REQ-015/REQ-034: filtering by a Set name clause narrows the chart total to matching items',
     (WidgetTester tester) async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -96,10 +130,7 @@ void main() {
         '120.00',
       );
 
-      await tester.tap(find.text('Set: All'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Base Set').last);
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Set name', op: '=', value: 'Base Set');
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
@@ -111,7 +142,7 @@ void main() {
   );
 
   testWidgets(
-    'REQ-015: saved filter persists across a fresh screen instance',
+    'REQ-015/REQ-034: saved clause persists across a fresh screen instance',
     (WidgetTester tester) async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -127,15 +158,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Set: All'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Base Set').last);
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Set name', op: '=', value: 'Base Set');
 
       await disposeAndFlush(tester);
 
       // Fresh screen instance -- same underlying SharedPreferences store.
-      // Dropdown selection auto-persists on change (no explicit save step).
+      // Clause auto-persists on add (no explicit save step).
       await tester.pumpWidget(
         MaterialApp(home: ValueTrendScreen(database: db)),
       );
@@ -145,13 +173,14 @@ void main() {
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
         '100.00',
       );
+      expect(find.text('Set name = Base Set'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
   );
 
   testWidgets(
-    'filtering by grade type narrows the chart total to matching items',
+    'REQ-034: filtering by a Grade type clause narrows the chart total to matching items',
     (WidgetTester tester) async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -181,10 +210,7 @@ void main() {
         '120.00',
       );
 
-      await tester.tap(find.text('Grade type: All'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('PSA').last);
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Grade type', op: '=', value: 'PSA');
 
       expect(
         tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
@@ -196,10 +222,12 @@ void main() {
   );
 
   testWidgets(
-    'a persisted filter value absent from current items falls back to All instead of crashing',
+    'REQ-034: a persisted clause referencing a value absent from current items yields zero matches, not a crash',
     (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues({
-        'value_trend_filter_set': 'Discontinued Set',
+        'value_trend_filter_clauses': jsonEncode([
+          {'field': 'setName', 'op': 'equal', 'value': 'Discontinued Set'},
+        ]),
       });
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -216,11 +244,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Set: All'), findsOneWidget);
-      expect(
-        tester.widget<Text>(find.byKey(const Key('value-trend-total'))).data,
-        '100.00',
-      );
+      expect(find.text('Matching items · 0'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
@@ -307,7 +331,7 @@ void main() {
   );
 
   testWidgets(
-    'REQ-022: Exclude sealed drops sealed items, independent of the Grade type filter',
+    'REQ-022/REQ-034: a Rarity != Sealed clause drops sealed items, independent of a Grade type clause',
     (WidgetTester tester) async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -334,15 +358,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Both items match Grade type = PSA before the toggle is applied.
-      await tester.tap(find.text('Grade type: All'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('PSA').last);
-      await tester.pumpAndSettle();
+      // Both items match Grade type = PSA before the exclude-sealed clause
+      // is added.
+      await addClause(tester, field: 'Grade type', op: '=', value: 'PSA');
       expect(find.text('Matching items · 2'), findsOneWidget);
 
-      await tester.tap(find.text('Exclude sealed'));
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Rarity', op: '!=', value: 'Sealed');
 
       expect(find.text('Matching items · 1'), findsOneWidget);
       expect(find.text('Charizard VMAX'), findsOneWidget);
@@ -408,7 +429,7 @@ void main() {
   );
 
   testWidgets(
-    'REQ-023: Rarity=Sealed + Exclude sealed together yield zero matching items',
+    'REQ-023/REQ-034: Rarity = Sealed + Rarity != Sealed clauses together yield zero matching items',
     (WidgetTester tester) async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -424,14 +445,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Rarity: All'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Sealed').last);
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Rarity', op: '=', value: 'Sealed');
       expect(find.text('Matching items · 1'), findsOneWidget);
 
-      await tester.tap(find.text('Exclude sealed'));
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Rarity', op: '!=', value: 'Sealed');
 
       expect(find.text('Matching items · 0'), findsOneWidget);
 
@@ -440,7 +457,7 @@ void main() {
   );
 
   testWidgets(
-    'a long set name does not overflow the filter dropdown row',
+    'REQ-034: adding a clause with a long set name value does not throw',
     (WidgetTester tester) async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(
@@ -458,11 +475,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Set: All'));
-      await tester.pumpAndSettle();
-      await tester
-          .tap(find.text('A Very Long Expansion Set Name That Would Never Fit On One Line').last);
-      await tester.pumpAndSettle();
+      await addClause(
+        tester,
+        field: 'Set name',
+        op: '=',
+        value: 'A Very Long Expansion Set Name That Would Never Fit On One Line',
+      );
 
       expect(tester.takeException(), isNull);
 

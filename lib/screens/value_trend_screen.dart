@@ -1,21 +1,16 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/database.dart';
+import '../widgets/search_filter_bar.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
 
-const _filterSetKey = 'value_trend_filter_set';
-const _filterRarityKey = 'value_trend_filter_rarity';
-const _filterGradeTypeKey = 'value_trend_filter_grade_type';
-const _filterExcludeSealedKey = 'value_trend_filter_exclude_sealed';
-
-/// ADR-12, Option 2: a cumulative value-trend chart over `watchAllItems()`,
-/// filterable by set/rarity/grade type, with an independent "exclude sealed"
-/// toggle (REQ-022), and the last-used filter persisted via
-/// shared_preferences so it survives app restart (REQ-015). Picker is a
-/// native `DropdownButton` per field, not the original dialog+chip picker --
-/// see Conventions.md.
+/// ADR-12 (superseded by ADR-19), ADR-19 Option 1: a cumulative value-trend
+/// chart over `watchAllItems()`, filterable via the shared
+/// [SearchFilterBar] (search term + clause builder), narrowing the same way
+/// [CollectionListScreen]'s (ADR-18) does -- via [filterCollectionItems].
+/// The filter's search term/clause list persist across restart through
+/// [SearchFilterBar]'s own `shared_preferences` keys (REQ-034).
 class ValueTrendScreen extends StatefulWidget {
   const ValueTrendScreen({super.key, required this.database});
 
@@ -26,97 +21,21 @@ class ValueTrendScreen extends StatefulWidget {
 }
 
 class _ValueTrendScreenState extends State<ValueTrendScreen> {
-  String? _filterSet;
-  String? _filterRarity;
-  String? _filterGradeType;
-  bool _filterExcludeSealed = false;
-  bool _loadedPersistedFilter = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPersistedFilter();
-  }
-
-  Future<void> _loadPersistedFilter() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _filterSet = prefs.getString(_filterSetKey);
-      _filterRarity = prefs.getString(_filterRarityKey);
-      _filterGradeType = prefs.getString(_filterGradeTypeKey);
-      _filterExcludeSealed = prefs.getBool(_filterExcludeSealedKey) ?? false;
-      _loadedPersistedFilter = true;
-    });
-  }
-
-  Future<void> _saveFilter() async {
-    final prefs = await SharedPreferences.getInstance();
-    for (final entry in {
-      _filterSetKey: _filterSet,
-      _filterRarityKey: _filterRarity,
-      _filterGradeTypeKey: _filterGradeType,
-    }.entries) {
-      if (entry.value == null) {
-        await prefs.remove(entry.key);
-      } else {
-        await prefs.setString(entry.key, entry.value!);
-      }
-    }
-    await prefs.setBool(_filterExcludeSealedKey, _filterExcludeSealed);
-  }
-
-  List<CollectionItem> _applyFilter(
-    List<CollectionItem> items, {
-    required String? filterSet,
-    required String? filterRarity,
-    required String? filterGradeType,
-    required bool filterExcludeSealed,
-  }) {
-    return items.where((item) {
-      if (filterSet != null && item.setName != filterSet) return false;
-      if (filterRarity != null && item.rarity != filterRarity) return false;
-      if (filterGradeType != null && item.gradeType != filterGradeType) {
-        return false;
-      }
-      if (filterExcludeSealed && item.rarity == 'Sealed') return false;
-      return true;
-    }).toList();
-  }
-
-  Widget _filterDropdown({
-    required String label,
-    required List<String> values,
-    required String? selected,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 130),
-      child: DropdownButton<String?>(
-        isExpanded: true,
-        hint: Text(label),
-        value: selected,
-        selectedItemBuilder: (context) => [
-          Text('$label: All', overflow: TextOverflow.ellipsis),
-          for (final v in values) Text('$label: $v', overflow: TextOverflow.ellipsis),
-        ],
-        items: [
-          DropdownMenuItem<String?>(value: null, child: Text('$label: All')),
-          for (final v in values) DropdownMenuItem<String?>(value: v, child: Text(v)),
-        ],
-        onChanged: (v) {
-          onChanged(v);
-          _saveFilter();
-        },
-      ),
-    );
-  }
+  List<CollectionItem> _filtered = const [];
+  // REQ-034: cached once, not re-created per build -- SearchFilterBar's
+  // onFiltered callback setState()s this very State, and re-calling
+  // watchAllItems() on every build would hand it a freshly-subscribed
+  // stream (a new emitted list identity) each time, which its own
+  // didUpdateWidget would read as "items changed" and recompute again,
+  // looping forever under pumpAndSettle.
+  late final Stream<List<CollectionItem>> _itemsStream = widget.database.watchAllItems();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Collection Value')),
       body: StreamBuilder<List<CollectionItem>>(
-        stream: widget.database.watchAllItems(),
+        stream: _itemsStream,
         builder: (context, snapshot) {
           // REQ-018 (ADR-07): this screen holds its own independent
           // watchAllItems() stream -- an unrecognized schema version must
@@ -139,28 +58,8 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
               ),
             );
           }
-          if (!_loadedPersistedFilter) {
-            return const Center(child: CircularProgressIndicator());
-          }
           final allItems = snapshot.data ?? const [];
-          final setNames = allItems.map((i) => i.setName).whereType<String>().toSet().toList()..sort();
-          final rarities = allItems.map((i) => i.rarity).whereType<String>().toSet().toList()..sort();
-          final gradeTypes = allItems.map((i) => i.gradeType).whereType<String>().toSet().toList()..sort();
-
-          // A persisted filter value may no longer exist among current items
-          // (the matching item was deleted/edited since the filter was
-          // saved) -- fall back to "All" rather than passing DropdownButton
-          // a value absent from its own items list, which throws.
-          final effectiveFilterSet = setNames.contains(_filterSet) ? _filterSet : null;
-          final effectiveFilterRarity = rarities.contains(_filterRarity) ? _filterRarity : null;
-          final effectiveFilterGradeType = gradeTypes.contains(_filterGradeType) ? _filterGradeType : null;
-          final filtered = _applyFilter(
-            allItems,
-            filterSet: effectiveFilterSet,
-            filterRarity: effectiveFilterRarity,
-            filterGradeType: effectiveFilterGradeType,
-            filterExcludeSealed: _filterExcludeSealed,
-          );
+          final filtered = _filtered;
 
           // REQ-015: cumulative running total over time, sorted by
           // dateAdded, matching ADR-12's "value trend over time" framing --
@@ -186,36 +85,10 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _filterDropdown(
-                      label: 'Set',
-                      values: setNames,
-                      selected: effectiveFilterSet,
-                      onChanged: (v) => setState(() => _filterSet = v),
-                    ),
-                    _filterDropdown(
-                      label: 'Rarity',
-                      values: rarities,
-                      selected: effectiveFilterRarity,
-                      onChanged: (v) => setState(() => _filterRarity = v),
-                    ),
-                    _filterDropdown(
-                      label: 'Grade type',
-                      values: gradeTypes,
-                      selected: effectiveFilterGradeType,
-                      onChanged: (v) => setState(() => _filterGradeType = v),
-                    ),
-                    FilterChip(
-                      label: const Text('Exclude sealed'),
-                      selected: _filterExcludeSealed,
-                      onSelected: (v) {
-                        setState(() => _filterExcludeSealed = v);
-                        _saveFilter();
-                      },
-                    ),
-                  ],
+                SearchFilterBar(
+                  prefsKeyPrefix: 'value_trend_filter',
+                  items: allItems,
+                  onFiltered: (result) => setState(() => _filtered = result),
                 ),
                 const SizedBox(height: 12),
                 Text(

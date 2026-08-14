@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../collection_search.dart';
 import '../database/database.dart';
 import '../import_schema.dart';
+import '../widgets/search_filter_bar.dart';
 import 'item_detail_screen.dart';
 
 /// ADR-06, Option A: acquires a file path via the native document picker.
@@ -324,107 +325,30 @@ class _FilterableCollectionList extends StatefulWidget {
 }
 
 class _FilterableCollectionListState extends State<_FilterableCollectionList> {
-  String _searchTerm = '';
-  final List<SearchClause> _clauses = [];
   List<CollectionItem> _filtered = const [];
-  // REQ-033: owned here, not by the TextField itself. The search field sits
-  // at a fixed ListView.builder index; a prior widget test using
-  // ScrollPosition.jumpTo did not reproduce text loss there, so the precise
-  // trigger (list virtualization disposing the item's Element/State, vs.
-  // something else) is not confirmed. This fix does not depend on knowing
-  // which: an uncontrolled TextField's typed text lives in its own State,
-  // which is at risk if that Element is ever destroyed and rebuilt for any
-  // reason; this State object is the ListView's parent, never virtualized,
-  // so moving ownership here removes the risk regardless of cause.
-  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _recompute();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant _FilterableCollectionList oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.items != widget.items) _recompute();
-  }
-
-  Future<void> _recompute() async {
-    final result = await filterCollectionItems(
-      widget.items,
-      searchTerm: _searchTerm,
-      clauses: _clauses,
-    );
-    if (mounted) setState(() => _filtered = result);
-  }
-
-  void _addClause(SearchClause clause) {
-    setState(() => _clauses.add(clause));
-    _recompute();
-  }
-
-  void _removeClause(int index) {
-    setState(() => _clauses.removeAt(index));
-    _recompute();
+    _filtered = widget.items;
   }
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      itemCount: _filtered.length + 4,
+      itemCount: _filtered.length + 3,
       itemBuilder: (context, index) {
         if (index == 0) {
           return CollectionDistributionCard(items: widget.items);
         }
         if (index == 1) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Search',
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (value) {
-                _searchTerm = value;
-                _recompute();
-              },
-            ),
+          return SearchFilterBar(
+            prefsKeyPrefix: 'collection_list_filter',
+            items: widget.items,
+            onFiltered: (filtered) => setState(() => _filtered = filtered),
           );
         }
         if (index == 2) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (var i = 0; i < _clauses.length; i++)
-                  InputChip(
-                    label: Text(
-                      '${_clauses[i].field.label} ${_clauses[i].op.symbol} ${_clauses[i].value}',
-                    ),
-                    onDeleted: () => _removeClause(i),
-                  ),
-                ActionChip(
-                  avatar: const Icon(Icons.add, size: 18),
-                  label: const Text('Add clause'),
-                  onPressed: () => _showAddClauseSheet(context, _filtered, _addClause),
-                ),
-              ],
-            ),
-          );
-        }
-        if (index == 3) {
           final matchingValue = collectionDistribution(_filtered).values.fold(
             0.0,
             (sum, v) => sum + v,
@@ -447,7 +371,7 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
             ),
           );
         }
-        final item = _filtered[index - 4];
+        final item = _filtered[index - 3];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
@@ -467,7 +391,7 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
                 builder: (_) => ItemDetailScreen(
                   database: widget.database,
                   items: _filtered,
-                  initialIndex: index - 4,
+                  initialIndex: index - 3,
                 ),
               ),
             ),
@@ -476,109 +400,4 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
       },
     );
   }
-}
-
-/// ADR-18, Option 2: sequential picker -- field, then an operator
-/// dropdown scoped to that field's type, then the value last (a number
-/// field for numeric/date fields, a dropdown of real distinct values,
-/// narrowed by [narrowed], for text fields).
-void _showAddClauseSheet(
-  BuildContext context,
-  List<CollectionItem> narrowed,
-  void Function(SearchClause) onAdd,
-) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) {
-      SearchField? field;
-      SearchOperator? op;
-      final valueController = TextEditingController();
-      String? textValue;
-
-      return StatefulBuilder(
-        builder: (context, setSheetState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('Add clause', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<SearchField>(
-                  initialValue: field,
-                  decoration: const InputDecoration(labelText: 'Field'),
-                  items: [
-                    for (final f in SearchField.values)
-                      DropdownMenuItem(value: f, child: Text(f.label)),
-                  ],
-                  onChanged: (value) => setSheetState(() {
-                    field = value;
-                    op = null;
-                    textValue = null;
-                    valueController.clear();
-                  }),
-                ),
-                if (field != null) ...[
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<SearchOperator>(
-                    initialValue: op,
-                    decoration: const InputDecoration(labelText: 'Operator'),
-                    items: [
-                      for (final o in operatorsFor(field!))
-                        DropdownMenuItem(value: o, child: Text(o.symbol)),
-                    ],
-                    onChanged: (value) => setSheetState(() => op = value),
-                  ),
-                ],
-                if (field != null && op != null) ...[
-                  const SizedBox(height: 12),
-                  if (field!.isText)
-                    DropdownButtonFormField<String>(
-                      initialValue: textValue,
-                      decoration: const InputDecoration(labelText: 'Value'),
-                      items: [
-                        for (final v in distinctValuesFor(field!, narrowed))
-                          DropdownMenuItem(value: v, child: Text(v)),
-                      ],
-                      onChanged: (value) => setSheetState(() => textValue = value),
-                    )
-                  else
-                    TextField(
-                      controller: valueController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Value'),
-                      onChanged: (_) => setSheetState(() {}),
-                    ),
-                ],
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: field == null || op == null
-                      || (field!.isText ? textValue == null : valueController.text.isEmpty)
-                      ? null
-                      : () {
-                          onAdd(
-                            SearchClause(
-                              field: field!,
-                              op: op!,
-                              value: field!.isText ? textValue! : valueController.text,
-                            ),
-                          );
-                          Navigator.of(context).pop();
-                        },
-                  child: const Text('Add'),
-                ),
-              ],
-            ),
-          );
-        },
-      );
-    },
-  );
 }

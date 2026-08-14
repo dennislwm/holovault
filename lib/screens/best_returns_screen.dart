@@ -4,12 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../annualized_return.dart';
 import '../database/database.dart';
+import '../widgets/search_filter_bar.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
 
-const _filterSetKey = 'best_returns_filter_set';
-const _filterRarityKey = 'best_returns_filter_rarity';
-const _filterGradeTypeKey = 'best_returns_filter_grade_type';
-const _filterExcludeSealedKey = 'best_returns_filter_exclude_sealed';
 const _minPaidKey = 'best_returns_min_paid';
 const _maxValueKey = 'best_returns_max_value';
 const _minDaysKey = 'best_returns_min_days';
@@ -20,44 +17,13 @@ const _defaultMaxValue = 100000.0;
 const _defaultMinDays = 90;
 const _defaultLimit = 5;
 
-// ponytail: duplicates ValueTrendScreen's _filterDropdown (ADR-12/REQ-024)
-// rather than extracting a shared widget -- ValueTrendScreen is an
-// already-Accepted, tested screen, and REQ-028 didn't ask for a refactor
-// of it. Extract to a shared widget if a third screen ever needs this.
-Widget _filterDropdown({
-  required String label,
-  required List<String> values,
-  required String? selected,
-  required ValueChanged<String?> onChanged,
-}) {
-  return ConstrainedBox(
-    constraints: const BoxConstraints(maxWidth: 130),
-    child: DropdownButton<String?>(
-      isExpanded: true,
-      hint: Text(label),
-      value: selected,
-      selectedItemBuilder: (context) => [
-        Text('$label: All', overflow: TextOverflow.ellipsis),
-        for (final v in values) Text('$label: $v', overflow: TextOverflow.ellipsis),
-      ],
-      items: [
-        DropdownMenuItem<String?>(value: null, child: Text('$label: All')),
-        for (final v in values) DropdownMenuItem<String?>(value: v, child: Text(v)),
-      ],
-      onChanged: onChanged,
-    ),
-  );
-}
-
-/// ADR-16, Option 1: ranks collection items by annualized return (CAGR)
-/// in a sortable DataTable whose "Return" column combines a
-/// proportional-width bar with its percent text in one DataCell --
-/// DataCell.child is a plain Widget, so bar-length ranking and every
-/// number (paid/value/days/return) render inline, no separate list.
-/// Reuses ValueTrendScreen's filter UI (Set/Rarity/Grade type/Exclude
-/// sealed) and its shared_preferences persistence pattern (ADR-12),
-/// extended to the four pyholofoil bind params (min paid, max value,
-/// min days, limit).
+/// ADR-16 (superseded by ADR-19), ADR-19 Option 1: ranks collection items by
+/// annualized return (CAGR) in a sortable DataTable whose "Return" column
+/// combines a proportional-width bar with its percent text in one DataCell.
+/// Filtering is now the shared [SearchFilterBar] (search term + clause
+/// builder), same as [ValueTrendScreen]/[CollectionListScreen]; `limit`
+/// stays this screen's own post-rank `Stepper`, out of ADR-19's scope
+/// (truncation, not a filter criterion).
 class BestReturnsScreen extends StatefulWidget {
   const BestReturnsScreen({super.key, required this.database});
 
@@ -68,10 +34,11 @@ class BestReturnsScreen extends StatefulWidget {
 }
 
 class _BestReturnsScreenState extends State<BestReturnsScreen> {
-  String? _filterSet;
-  String? _filterRarity;
-  String? _filterGradeType;
-  bool _filterExcludeSealed = false;
+  List<CollectionItem> _filtered = const [];
+  // REQ-034: see ValueTrendScreen's identical field -- same feedback-loop
+  // risk from SearchFilterBar's onFiltered callback setState()ing this
+  // State.
+  late final Stream<List<CollectionItem>> _itemsStream = widget.database.watchAllItems();
   double _minPaid = _defaultMinPaid;
   double _maxValue = _defaultMaxValue;
   int _minDays = _defaultMinDays;
@@ -101,10 +68,6 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
   Future<void> _loadPersisted() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _filterSet = prefs.getString(_filterSetKey);
-      _filterRarity = prefs.getString(_filterRarityKey);
-      _filterGradeType = prefs.getString(_filterGradeTypeKey);
-      _filterExcludeSealed = prefs.getBool(_filterExcludeSealedKey) ?? false;
       _minPaid = prefs.getDouble(_minPaidKey) ?? _defaultMinPaid;
       _maxValue = prefs.getDouble(_maxValueKey) ?? _defaultMaxValue;
       _minDays = prefs.getInt(_minDaysKey) ?? _defaultMinDays;
@@ -115,40 +78,12 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
     });
   }
 
-  Future<void> _saveFilter() async {
-    final prefs = await SharedPreferences.getInstance();
-    for (final entry in {
-      _filterSetKey: _filterSet,
-      _filterRarityKey: _filterRarity,
-      _filterGradeTypeKey: _filterGradeType,
-    }.entries) {
-      if (entry.value == null) {
-        await prefs.remove(entry.key);
-      } else {
-        await prefs.setString(entry.key, entry.value!);
-      }
-    }
-    await prefs.setBool(_filterExcludeSealedKey, _filterExcludeSealed);
-  }
-
   Future<void> _saveParams() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_minPaidKey, _minPaid);
     await prefs.setDouble(_maxValueKey, _maxValue);
     await prefs.setInt(_minDaysKey, _minDays);
     await prefs.setInt(_limitKey, _limit);
-  }
-
-  List<CollectionItem> _applyFilter(List<CollectionItem> items) {
-    return items.where((item) {
-      if (_filterSet != null && item.setName != _filterSet) return false;
-      if (_filterRarity != null && item.rarity != _filterRarity) return false;
-      if (_filterGradeType != null && item.gradeType != _filterGradeType) {
-        return false;
-      }
-      if (_filterExcludeSealed && item.rarity == 'Sealed') return false;
-      return true;
-    }).toList();
   }
 
   void _sortBy(int columnIndex) {
@@ -163,7 +98,7 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Best Returns')),
       body: StreamBuilder<List<CollectionItem>>(
-        stream: widget.database.watchAllItems(),
+        stream: _itemsStream,
         builder: (context, snapshot) {
           // REQ-018 (ADR-07): this screen holds its own independent
           // watchAllItems() stream -- an unrecognized schema version must
@@ -190,23 +125,9 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final allItems = snapshot.data ?? const [];
-          final setNames = allItems.map((i) => i.setName).whereType<String>().toSet().toList()..sort();
-          final rarities = allItems.map((i) => i.rarity).whereType<String>().toSet().toList()..sort();
-          final gradeTypes = allItems.map((i) => i.gradeType).whereType<String>().toSet().toList()..sort();
 
-          // A persisted filter value may no longer exist among current
-          // items -- fall back to "All" rather than passing DropdownButton
-          // a value absent from its own items list, which throws.
-          final effectiveFilterSet = setNames.contains(_filterSet) ? _filterSet : null;
-          final effectiveFilterRarity = rarities.contains(_filterRarity) ? _filterRarity : null;
-          final effectiveFilterGradeType = gradeTypes.contains(_filterGradeType) ? _filterGradeType : null;
-          _filterSet = effectiveFilterSet;
-          _filterRarity = effectiveFilterRarity;
-          _filterGradeType = effectiveFilterGradeType;
-
-          final filtered = _applyFilter(allItems);
           final ranked = computeAnnualizedReturns(
-            filtered,
+            _filtered,
             minPaid: _minPaid,
             maxValue: _maxValue,
             minDays: _minDays,
@@ -239,45 +160,10 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Wrap(
-                spacing: 8,
-                children: [
-                  _filterDropdown(
-                    label: 'Set',
-                    values: setNames,
-                    selected: effectiveFilterSet,
-                    onChanged: (v) {
-                      setState(() => _filterSet = v);
-                      _saveFilter();
-                    },
-                  ),
-                  _filterDropdown(
-                    label: 'Rarity',
-                    values: rarities,
-                    selected: effectiveFilterRarity,
-                    onChanged: (v) {
-                      setState(() => _filterRarity = v);
-                      _saveFilter();
-                    },
-                  ),
-                  _filterDropdown(
-                    label: 'Grade type',
-                    values: gradeTypes,
-                    selected: effectiveFilterGradeType,
-                    onChanged: (v) {
-                      setState(() => _filterGradeType = v);
-                      _saveFilter();
-                    },
-                  ),
-                  FilterChip(
-                    label: const Text('Exclude sealed'),
-                    selected: _filterExcludeSealed,
-                    onSelected: (v) {
-                      setState(() => _filterExcludeSealed = v);
-                      _saveFilter();
-                    },
-                  ),
-                ],
+              SearchFilterBar(
+                prefsKeyPrefix: 'best_returns_filter',
+                items: allItems,
+                onFiltered: (result) => setState(() => _filtered = result),
               ),
               const SizedBox(height: 12),
               Wrap(

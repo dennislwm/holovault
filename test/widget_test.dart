@@ -74,9 +74,24 @@ void main() {
 
       await tester.tap(find.text('Value trend'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Rarity: All'));
+      // REQ-034 (ADR-19): the clause-builder bottom sheet replaces the old
+      // Rarity dropdown -- same field/operator/value sequence as
+      // widget_test.dart's own "adding a clause via the bottom sheet" test.
+      await tester.tap(find.text('Add clause'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Field').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rarity').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Operator').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('=').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Value').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Holo').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').last);
       await tester.pumpAndSettle();
       expect(find.text('Matching items · 1'), findsOneWidget);
 
@@ -89,7 +104,7 @@ void main() {
 
       await tester.tap(find.text('Value trend'));
       await tester.pumpAndSettle();
-      expect(find.text('Rarity: Holo'), findsOneWidget);
+      expect(find.text('Rarity = Holo'), findsOneWidget);
       expect(find.text('Matching items · 1'), findsOneWidget);
 
       await disposeAndFlush(tester);
