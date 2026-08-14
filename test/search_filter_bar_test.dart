@@ -119,6 +119,11 @@ void main() {
     await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
 
+    // REQ-039: delete now confirms first.
+    expect(find.text('Delete "Charizards"?'), findsOneWidget);
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
 
     await disposeAndFlush(tester);
@@ -159,4 +164,28 @@ void main() {
       await disposeAndFlush(tester);
     },
   );
+
+  testWidgets('REQ-039: cancelling the delete confirmation keeps the preset',
+      (WidgetTester tester) async {
+    await pump(tester);
+
+    await tester.enterText(find.byType(TextField).first, 'char');
+    await tester.pump();
+    await saveAs(tester, 'Charizards');
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete "Charizards"?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    // Cancel only dismisses the confirm dialog -- the preset dropdown
+    // menu is still open underneath it, so the preset is already visible.
+    expect(find.text('Charizards'), findsWidgets);
+
+    await disposeAndFlush(tester);
+  });
 }

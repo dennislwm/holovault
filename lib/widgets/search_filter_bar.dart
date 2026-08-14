@@ -146,6 +146,27 @@ class SearchFilterBarState extends State<SearchFilterBar> {
     _persistPresets();
   }
 
+  /// REQ-039: deleting a preset has no undo, so confirm before it happens.
+  Future<void> _confirmDeletePreset(BuildContext context, String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete "$name"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) _deletePreset(name);
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -231,7 +252,9 @@ class SearchFilterBarState extends State<SearchFilterBar> {
                         Expanded(child: Text(preset.name, overflow: TextOverflow.ellipsis)),
                         IconButton(
                           icon: const Icon(Icons.delete_outline, size: 18),
-                          onPressed: () => _deletePreset(preset.name),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          onPressed: () => _confirmDeletePreset(context, preset.name),
                         ),
                       ],
                     ),
