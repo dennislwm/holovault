@@ -16,6 +16,8 @@ First run on a fresh checkout: [Maintainer setup](#maintainer-setup) (`flutter c
    - No devices listed at all? Run `make status` -- it checks whether an iOS runtime is installed.
    - Testing on a physical device without staying tethered to the Mac? Use `make run-release`
      instead -- see [Physical device testing](#physical-device-testing) below.
+   - More than one device connected? Pass flutter flags to `make run-release` through `ARGS`
+     (`run` does not take it), e.g. `make run-release ARGS="-d <device-id>"` (ids come from `make devices`).
 
 Day-to-day loop is 2 -> 3 -> 4; re-run 1 only when `pubspec.yaml` changes.
 
@@ -28,7 +30,7 @@ One-time device pairing:
 1. On the phone: Settings -> Privacy & Security -> Developer Mode -> on, restart, then confirm "Turn On Developer Mode?" after unlock.
    - Missing from Privacy & Security entirely? It appears automatically the first time Xcode tries to install a build -- skip ahead and try step 3, then come back.
 2. Plug your iPhone into your Mac and unlock it. Wireless pairing (Xcode -> Window -> Devices and Simulators, "Connect via network") is optional and its exact UI varies by Xcode version -- if you don't see it, stick with USB; it's not required for `make run`.
-3. Run `flutter devices` -- your phone should appear under the connected devices list.
+3. Run `make devices` (wraps `flutter devices`) -- your phone should appear under the connected devices list.
    - Not listed? Check the phone screen for a "Trust This Computer?" prompt (can appear silently after unplug/replug) and accept it. If Xcode's own Devices and Simulators window (Window -> Devices and Simulators) doesn't see it either, it's a cable or port issue, not a Flutter one -- try a different cable (some are charge-only) or a different USB port.
 4. `make run` (or `flutter run -d <device-id>`) fails the first time with "No valid code signing certificates were found" -- one manual Xcode step is needed before it can auto-provision anything.
 5. Run `open ios/Runner.xcworkspace`.
