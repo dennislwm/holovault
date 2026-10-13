@@ -1,5 +1,6 @@
 import 'package:local_query_filter/local_query_filter.dart';
 
+import 'annualized_return.dart';
 import 'database/database.dart';
 
 /// ADR-18, Option 2: fields an ad hoc clause can target.
@@ -12,12 +13,36 @@ enum SearchField {
   daysHeld('Days held'),
   rarity('Rarity'),
   gradeType('Grade type'),
-  setName('Set name');
+  setName('Set name'),
+  // REQ-041: percent values (a typed `20` means 20%). Never rename these --
+  // persisted clauses and presets store `field.name`. Kept after setName so
+  // the existing text fields keep their picker position.
+  returnAnnual('Return/annual'),
+  returnBase('Return/base');
 
   const SearchField(this.label);
   final String label;
 
   bool get isText => this == rarity || this == gradeType || this == setName;
+
+  /// REQ-041: the return field the Add clause picker hides once this one is
+  /// used in a clause. Picker-only -- evaluation never consults it.
+  SearchField? get rival => switch (this) {
+        returnAnnual => returnBase,
+        returnBase => returnAnnual,
+        _ => null,
+      };
+}
+
+/// REQ-041: the fields the Add clause picker offers given the clauses
+/// already added -- every field except one whose [SearchField.rival] is in
+/// use. Removing the clause brings the rival back (derived, not stored).
+List<SearchField> availableFields(List<SearchClause> clauses) {
+  final used = {for (final c in clauses) c.field};
+  return [
+    for (final f in SearchField.values)
+      if (!used.contains(f.rival)) f,
+  ];
 }
 
 enum SearchOperator {
@@ -81,6 +106,10 @@ num? _numericFieldValue(CollectionItem item, SearchField field, DateTime now) {
       return item.quantity;
     case SearchField.daysHeld:
       return _daysHeld(item, now);
+    case SearchField.returnAnnual:
+      return annualizedReturnPercent(item, now);
+    case SearchField.returnBase:
+      return baseReturnPercent(item);
     case SearchField.rarity:
     case SearchField.gradeType:
     case SearchField.setName:
@@ -102,6 +131,8 @@ String? textFieldValue(CollectionItem item, SearchField field) {
     case SearchField.paidPerUnit:
     case SearchField.quantity:
     case SearchField.daysHeld:
+    case SearchField.returnAnnual:
+    case SearchField.returnBase:
       return null;
   }
 }

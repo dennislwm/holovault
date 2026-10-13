@@ -188,4 +188,42 @@ void main() {
 
     await disposeAndFlush(tester);
   });
+
+  testWidgets(
+    'REQ-041: using one return field hides its rival from the next Add clause',
+    (WidgetTester tester) async {
+      // 11 Field items overflow the default 600px surface, and the dropdown
+      // only builds items that fit; a taller view builds them all.
+      tester.view.physicalSize = const Size(2400, 3600);
+      addTearDown(tester.view.reset);
+      await pump(tester);
+
+      await tester.tap(find.text('Add clause'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Field'));
+      await tester.pumpAndSettle();
+      // Control: both return fields are offered before any clause exists.
+      expect(find.text('Return/base'), findsWidgets);
+      await tester.tap(find.text('Return/annual').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Operator'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('>').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Value'), '20');
+      await tester.pump();
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Add clause'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Field'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Return/annual'), findsWidgets);
+      expect(find.text('Return/base'), findsNothing);
+
+      await disposeAndFlush(tester);
+    },
+  );
 }

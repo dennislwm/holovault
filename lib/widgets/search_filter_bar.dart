@@ -287,7 +287,12 @@ class SearchFilterBarState extends State<SearchFilterBar> {
               ActionChip(
                 avatar: const Icon(Icons.add, size: 18),
                 label: const Text('Add clause'),
-                onPressed: () => showAddClauseSheet(context, _filtered, _addClause),
+                onPressed: () => showAddClauseSheet(
+                  context,
+                  _filtered,
+                  _addClause,
+                  existing: _clauses,
+                ),
               ),
             ],
           ),
@@ -335,15 +340,19 @@ class SearchFilterBarState extends State<SearchFilterBar> {
 /// scoped to that field's type, then the value last (a number field for
 /// numeric/date fields, a dropdown of real distinct values, narrowed by
 /// [narrowed], for text fields). Shared by every [SearchFilterBar] instance.
+/// REQ-041: [existing] is the clause list already added, so the Field
+/// dropdown can hide a return field whose rival is already in use.
 void showAddClauseSheet(
   BuildContext context,
   List<CollectionItem> narrowed,
-  void Function(SearchClause) onAdd,
-) {
+  void Function(SearchClause) onAdd, {
+  List<SearchClause> existing = const [],
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => _AddClauseSheet(narrowed: narrowed, onAdd: onAdd),
+    builder: (context) =>
+        _AddClauseSheet(narrowed: narrowed, onAdd: onAdd, existing: existing),
   );
 }
 
@@ -354,10 +363,15 @@ void showAddClauseSheet(
 /// object instead of relying on an enclosing builder closure staying
 /// intact across every rebuild, removing that fragility class outright.
 class _AddClauseSheet extends StatefulWidget {
-  const _AddClauseSheet({required this.narrowed, required this.onAdd});
+  const _AddClauseSheet({
+    required this.narrowed,
+    required this.onAdd,
+    required this.existing,
+  });
 
   final List<CollectionItem> narrowed;
   final void Function(SearchClause) onAdd;
+  final List<SearchClause> existing;
 
   @override
   State<_AddClauseSheet> createState() => _AddClauseSheetState();
@@ -394,7 +408,7 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
             initialValue: _field,
             decoration: const InputDecoration(labelText: 'Field'),
             items: [
-              for (final f in SearchField.values)
+              for (final f in availableFields(widget.existing))
                 DropdownMenuItem(value: f, child: Text(f.label)),
             ],
             onChanged: (value) => setState(() {
