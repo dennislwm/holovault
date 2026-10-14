@@ -2,6 +2,10 @@
 
 DEVICE ?= iPhone 16
 
+# -d only when DEVICE came from the command line or environment, so a bare
+# `make run` keeps flutter's own device choice (the default above is for boot-sim).
+RUN_DEVICE = $(if $(filter file,$(origin DEVICE)),,-d "$(DEVICE)")
+
 help:
 	@echo ""
 	@echo "Workflow: setup -> analyze -> test -> boot-sim -> run"
@@ -13,6 +17,7 @@ help:
 	@echo "  test          Run flutter test suite"
 	@echo "                Requires: setup"
 	@echo "  run           flutter run (iOS simulator/device by default)"
+	@echo "                DEVICE: a device name or id from 'make devices', e.g. DEVICE=\"My iPhone\""
 	@echo "                Requires: setup"
 	@echo "                Requires: ios/"
 	@echo "                run 'flutter create --platforms=ios --org com.dennislwm --project-name holovault .' once"
@@ -20,7 +25,8 @@ help:
 	@echo "  run-release   flutter run --release -- builds a standalone install that keeps working"
 	@echo "                after disconnecting from the Mac (a debug build refuses to launch"
 	@echo "                without an attached flutter/Xcode session -- iOS blocks ptrace outside it)"
-	@echo "                ARGS: extra flutter flags, e.g. ARGS=\"-d <device-id>\""
+	@echo "                DEVICE: a device name or id from 'make devices', e.g. DEVICE=\"My iPhone\""
+	@echo "                ARGS: other flutter flags (use DEVICE, not ARGS, to pick the device)"
 	@echo "                Requires: setup"
 	@echo "                Requires: a booted iOS simulator or connected device -- run 'make boot-sim'"
 	@echo "  build-ios     flutter build ios"
@@ -52,10 +58,10 @@ test:
 	flutter test $(ARGS)
 
 run:
-	flutter run
+	flutter run $(RUN_DEVICE)
 
 run-release:
-	flutter run --release $(ARGS)
+	flutter run --release $(RUN_DEVICE) $(ARGS)
 
 devices:
 	flutter devices

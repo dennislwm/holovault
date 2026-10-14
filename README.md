@@ -16,8 +16,9 @@ First run on a fresh checkout: [Maintainer setup](#maintainer-setup) (`flutter c
    - No devices listed at all? Run `make status` -- it checks whether an iOS runtime is installed.
    - Testing on a physical device without staying tethered to the Mac? Use `make run-release`
      instead -- see [Physical device testing](#physical-device-testing) below.
-   - More than one device connected? Pass flutter flags to `make run-release` through `ARGS`
-     (`run` does not take it), e.g. `make run-release ARGS="-d <device-id>"` (ids come from `make devices`).
+   - More than one device connected? Pick one with `DEVICE`, by name or id from `make devices`:
+     `make run DEVICE="My iPhone"` or `make run-release DEVICE="My iPhone"`. Without `DEVICE`,
+     flutter chooses. Use `ARGS` on `run-release` for other flutter flags, not for the device.
 
 Day-to-day loop is 2 -> 3 -> 4; re-run 1 only when `pubspec.yaml` changes.
 
