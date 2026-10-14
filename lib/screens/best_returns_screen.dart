@@ -5,6 +5,7 @@ import '../annualized_return.dart';
 import '../database/database.dart';
 import '../widgets/search_filter_bar.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
+import 'item_detail_screen.dart';
 
 const _limitKey = 'best_returns_limit';
 
@@ -184,6 +185,7 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                   child: DataTable(
                     sortColumnIndex: _sortColumnIndex,
                     sortAscending: _sortAscending,
+                    showCheckboxColumn: false,
                     columns: [
                       DataColumn(
                         label: const Text('Item'),
@@ -211,8 +213,18 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                       ),
                     ],
                     rows: [
-                      for (final r in ranked)
+                      for (final (i, r) in ranked.indexed)
                         DataRow(
+                          // REQ-042 (a): open the item, paging the displayed (sorted) list.
+                          onSelectChanged: (_) => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ItemDetailScreen(
+                                database: widget.database,
+                                items: [for (final x in ranked) x.item],
+                                initialIndex: i,
+                              ),
+                            ),
+                          ),
                           cells: [
                             DataCell(Text(r.item.name)),
                             DataCell(

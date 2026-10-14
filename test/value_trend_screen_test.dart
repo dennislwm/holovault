@@ -487,4 +487,27 @@ void main() {
       await disposeAndFlush(tester);
     },
   );
+
+
+  testWidgets(
+    'REQ-042 (a): tapping a row opens the detail screen on that item',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+            importedId: 'card-1', name: 'Charizard'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: ValueTrendScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('value-trend-row-0')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Item detail'), findsOneWidget);
+      expect(find.text('Charizard'), findsNWidgets(2));
+
+      await disposeAndFlush(tester);
+    },
+  );
 }

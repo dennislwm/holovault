@@ -206,4 +206,40 @@ void main() {
       await disposeAndFlush(tester);
     },
   );
+
+
+  testWidgets(
+    'REQ-042 (a): tapping a ranked row opens the detail screen on that item',
+    (WidgetTester tester) async {
+      for (final (id, name, value) in [
+        ('card-1', 'Slow grower', 150.0),
+        ('card-2', 'Fast grower', 300.0),
+      ]) {
+        await db.upsertItem(
+          CollectionItemsCompanion.insert(
+            importedId: id,
+            name: name,
+            paidPerUnit: const Value(100.0),
+            valuePerUnit: Value(value),
+            dateAdded:
+                Value(DateTime.now().subtract(const Duration(days: 200))),
+          ),
+        );
+      }
+      await tester.pumpWidget(
+        MaterialApp(home: BestReturnsScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+
+      // Default sort is Return descending, so the slow grower is row 1: the
+      // tapped index must map into the displayed list, not storage order.
+      await tester.tap(find.text('Slow grower'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Item detail'), findsOneWidget);
+      expect(find.text('Slow grower'), findsNWidgets(2));
+
+      await disposeAndFlush(tester);
+    },
+  );
 }

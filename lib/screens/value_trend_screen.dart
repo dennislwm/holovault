@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database/database.dart';
 import '../widgets/search_filter_bar.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
+import 'item_detail_screen.dart';
 
 /// ADR-12 (superseded by ADR-19), ADR-19 Option 1: a cumulative value-trend
 /// chart over `watchAllItems()`, filterable via the shared
@@ -125,10 +126,22 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                   'Matching items · ${filtered.length}',
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
-                for (final item in filtered)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
+                for (final (i, item) in filtered.indexed)
+                  InkWell(
+                    key: Key('value-trend-row-$i'),
+                    // REQ-042 (a): same browse-then-open as the Collection tab.
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ItemDetailScreen(
+                          database: widget.database,
+                          items: filtered,
+                          initialIndex: i,
+                        ),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
                       children: [
                         Expanded(
                           child: Column(
@@ -156,6 +169,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                           ],
                         ),
                       ],
+                    ),
                     ),
                   ),
             ],
