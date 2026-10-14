@@ -4,6 +4,9 @@ import '../annualized_return.dart';
 import '../collection_search.dart';
 import '../database/database.dart';
 
+/// REQ-042 (f): shown by every item list when its filter leaves no rows.
+const noMatchingItemsMessage = 'No items match the current filter';
+
 /// REQ-042 (c), ADR-22 Option 1: the row shared by the item-list tabs. The
 /// first chosen column is the title, the second the subtitle, the rest are
 /// trailing values stacked right-aligned in chosen order. The host wraps it

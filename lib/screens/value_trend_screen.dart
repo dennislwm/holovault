@@ -106,6 +106,10 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
+                  'Chart total',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+                Text(
                   total.toStringAsFixed(2),
                   key: const Key('value-trend-total'),
                   style: Theme.of(context).textTheme.headlineSmall,
@@ -149,6 +153,11 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                     _sortAsc = asc;
                   }),
                 ),
+                if (displayed.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(child: Text(noMatchingItemsMessage)),
+                  ),
                 for (final (i, item) in displayed.indexed)
                   InkWell(
                     key: Key('value-trend-row-$i'),

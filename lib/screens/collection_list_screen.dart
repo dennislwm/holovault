@@ -326,7 +326,7 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
         ? maxAbsReturnAnnual(displayed)
         : 0.0;
     return ListView.builder(
-      itemCount: displayed.length + 3,
+      itemCount: displayed.length + 3 + (displayed.isEmpty ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == 0) {
           return CollectionDistributionCard(items: widget.items);
@@ -352,6 +352,12 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
               _sortKey = key;
               _sortAsc = asc;
             }),
+          );
+        }
+        if (displayed.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text(noMatchingItemsMessage)),
           );
         }
         final item = displayed[index - 3];

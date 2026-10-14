@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -280,6 +281,34 @@ void main() {
 
       expect(find.textContaining('Days held'), findsNothing);
       expect(find.text('Grower'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-042 (f): a filter that matches nothing shows the empty-state message',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'best_returns_filter_clauses': jsonEncode([
+          {'field': 'setName', 'op': 'equal', 'value': 'Discontinued Set'},
+        ]),
+      });
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Charizard',
+          setName: const Value('Base Set'),
+          paidPerUnit: const Value(10.0),
+          valuePerUnit: const Value(20.0),
+          dateAdded: Value(DateTime.now().subtract(const Duration(days: 200))),
+        ),
+      );
+      await tester.pumpWidget(MaterialApp(home: BestReturnsScreen(database: db)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No items match the current filter'), findsOneWidget);
+      expect(find.text('Charizard'), findsNothing);
 
       await disposeAndFlush(tester);
     },

@@ -183,7 +183,7 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
               if (ranked.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: Text('No items match these filters/params')),
+                  child: Center(child: Text(noMatchingItemsMessage)),
                 )
               else
                 for (final (i, r) in ranked.indexed)

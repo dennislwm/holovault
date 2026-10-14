@@ -249,6 +249,9 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('0 matching items'), findsOneWidget);
+      // REQ-042 (e)/(f): the headline is labelled, and an empty list says why.
+      expect(find.text('Chart total'), findsOneWidget);
+      expect(find.text('No items match the current filter'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
