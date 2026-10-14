@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:local_query_filter/local_query_filter.dart';
 
 import 'annualized_return.dart';
@@ -275,4 +277,55 @@ Map<String, double> collectionDistribution(List<CollectionItem> items) {
     totals[category] = totals[category]! + (item.valueTotal ?? 0);
   }
   return totals;
+}
+
+/// REQ-042 (c), ADR-22: the text a row cell shows for column [id], or null
+/// when the item has no value for it. Money to two decimals, percent to one,
+/// quantity as `×N`, text fields verbatim.
+String? cellText(CollectionItem item, String id, {DateTime? now}) {
+  if (id == nameSortKey) return item.name;
+  if (id == extraSortKey) return item.extra;
+  final field = SearchField.values.byName(id);
+  if (field.isText) return textFieldValue(item, field);
+  final v = _numericFieldValue(item, field, now ?? DateTime.now());
+  if (v == null) return null;
+  return switch (field) {
+    SearchField.quantity => '×$v',
+    SearchField.daysHeld => '$v',
+    SearchField.returnAnnual || SearchField.returnBase => '${v.toStringAsFixed(1)}%',
+    _ => v.toStringAsFixed(2),
+  };
+}
+
+/// REQ-042 (c): the largest absolute annual return over [items], the
+/// denominator for the row's return bar. 0 when none has a return.
+double maxAbsReturnAnnual(List<CollectionItem> items, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  var max = 0.0;
+  for (final i in items) {
+    final p = annualizedReturnPercent(i, today);
+    if (p != null && p.abs() > max) max = p.abs();
+  }
+  return max;
+}
+
+/// REQ-042 (c): column ids from a stored JSON list. Unknown ids, duplicates
+/// and wrong-typed entries are skipped; a missing, malformed or empty result
+/// falls back to [fallback].
+List<String> parseColumnIds(Object? stored, List<String> fallback) {
+  if (stored is! String) return fallback;
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(stored);
+  } catch (_) {
+    return fallback;
+  }
+  if (decoded is! List) return fallback;
+  final ids = [
+    ...{
+    for (final e in decoded)
+      if (e is String && sortKeyIds.contains(e)) e,
+    },
+  ];
+  return ids.isEmpty ? fallback : ids;
 }

@@ -50,6 +50,20 @@ A free-account certificate expires after 7 days -- re-run `make run` weekly to r
     make status      # check flutter/xcode toolchain is installed
     make check-pins  # flag pubspec.yaml dependencies with no version constraint
 
+## List columns and sort
+
+Requires: [ADR-22](https://github.com/dennislwm/holovault/wiki/decisions/adr-22-shared-item-list)
+
+On the Collection, Value trend and Best Returns tabs the strip above the
+list sets the sort key and direction. On Collection and Value trend its
+Columns button opens a dialog:
+
+1. Tick the fields a row should show.
+2. Drag the handles to reorder: the first is the row title, the second the
+   subtitle, the rest are listed on the right.
+3. Apply. The choice is remembered per tab; unticking everything restores
+   that tab's default.
+
 ## Override columns
 
 Requires: [ADR-03](https://github.com/dennislwm/holovault/wiki/decisions/adr-03-override-schema-extension)

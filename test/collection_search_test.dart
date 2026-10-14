@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:holovault/annualized_return.dart';
 import 'package:holovault/collection_search.dart';
 import 'package:holovault/database/database.dart';
 
@@ -309,5 +310,72 @@ void main() {
       expect(sortItems(items, nameSortKey, true).map((i) => i.name), ['A', 'b', 'C']);
       expect(sortItems(items, 'no_such_key', true), items);
     });
+  });
+
+  group('REQ-042 (c): parseColumnIds', () {
+    const fallback = ['name', 'extra'];
+
+    test('keeps known ids in order and skips unknown, duplicate and non-string entries', () {
+      expect(
+        parseColumnIds('["paid","bogus","name",7,"paid"]', fallback),
+        ['paid', 'name'],
+      );
+    });
+
+    test('missing, malformed, wrong-typed or empty falls back', () {
+      expect(parseColumnIds(null, fallback), fallback);
+      expect(parseColumnIds('not json', fallback), fallback);
+      expect(parseColumnIds('{"a":1}', fallback), fallback);
+      expect(parseColumnIds(5, fallback), fallback);
+      expect(parseColumnIds('["bogus"]', fallback), fallback);
+      expect(parseColumnIds('[]', fallback), fallback);
+    });
+  });
+
+  test('REQ-042 (c): maxAbsReturnAnnual is 0 for no items or no return and the largest absolute value otherwise', () async {
+    expect(maxAbsReturnAnnual(const []), 0);
+    final now = DateTime(2026, 1, 1);
+    final bought = DateTime(2025, 1, 1);
+    for (final (id, paid, value) in [
+      ('1', 100.0, 150.0),
+      ('2', 100.0, 40.0),
+      ('3', 100.0, null),
+    ]) {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: id,
+          name: id,
+          paidPerUnit: Value(paid),
+          valuePerUnit: Value(value),
+          dateAdded: Value(bought),
+        ),
+      );
+    }
+    final items = await db.watchAllItems().first;
+    expect(maxAbsReturnAnnual([items.last], now: now), 0);
+    final byId = {for (final i in items) i.importedId: i};
+    final up = annualizedReturnPercent(byId['1']!, now)!;
+    final down = annualizedReturnPercent(byId['2']!, now)!;
+    expect(maxAbsReturnAnnual(items, now: now), closeTo(up.abs() > down.abs() ? up.abs() : down.abs(), 1e-9));
+    expect(down, isNegative);
+  });
+
+  test('REQ-042 (c): cellText formats each field kind and reports a missing value as null', () async {
+    await db.upsertItem(
+      CollectionItemsCompanion.insert(
+        importedId: '1',
+        name: 'A',
+        quantity: const Value(3),
+        paidTotal: const Value(12.5),
+        rarity: const Value('Holo'),
+      ),
+    );
+    final item = (await db.watchAllItems().first).single;
+    expect(cellText(item, 'name'), 'A');
+    expect(cellText(item, 'extra'), isNull);
+    expect(cellText(item, 'quantity'), '×3');
+    expect(cellText(item, 'paid'), '12.50');
+    expect(cellText(item, 'rarity'), 'Holo');
+    expect(cellText(item, 'value'), isNull);
   });
 }

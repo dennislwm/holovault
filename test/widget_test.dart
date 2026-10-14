@@ -934,4 +934,136 @@ void main() {
       await disposeAndFlush(tester);
     },
   );
+
+  Future<void> seedColumnsItem() => db.upsertItem(
+    CollectionItemsCompanion.insert(
+      importedId: 'card-1',
+      name: 'Charizard',
+      extra: const Value('first ed'),
+      quantity: const Value(3),
+      paidTotal: const Value(40),
+    ),
+  );
+
+  testWidgets(
+    'REQ-042 (c): columns dialog changes the row, a restart keeps it, and clearing every column restores the default',
+    (WidgetTester tester) async {
+      await seedColumnsItem();
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      expect(find.text('first ed'), findsOneWidget); // default subtitle: Extra
+      expect(find.text('×3'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('columns-button')).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(CheckboxListTile, 'Quantity'));
+      await tester.tap(find.widgetWithText(CheckboxListTile, 'Paid'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+      expect(find.text('×3'), findsNothing);
+      expect(find.text('Paid: 40.00'), findsOneWidget);
+
+      // Restart: the persisted columns come back.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      expect(find.text('Paid: 40.00'), findsOneWidget);
+
+      // Uncheck everything: the screen default returns.
+      await tester.tap(find.byKey(const Key('columns-button')).first);
+      await tester.pumpAndSettle();
+      for (final label in ['Name', 'Extra', 'Paid']) {
+        await tester.tap(find.widgetWithText(CheckboxListTile, label));
+      }
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+      expect(find.text('×3'), findsOneWidget);
+      expect(find.text('first ed'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-042 (c): dragging a column to the top makes it the row title',
+    (WidgetTester tester) async {
+      await seedColumnsItem();
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('columns-button')).first);
+      await tester.pumpAndSettle();
+      await tester.drag(find.byKey(const Key('drag-quantity')), const Offset(0, -200));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      // Quantity (title), Name (subtitle), Extra now trailing and labelled.
+      expect(find.text('×3'), findsOneWidget);
+      expect(find.text('Extra: first ed'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('×3')).dy,
+        lessThan(tester.getTopLeft(find.text('Charizard')).dy),
+      );
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-042 (c): stored column ids that match no field are skipped on load',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'collection_list_filter_columns': '["bogus","quantity","name"]',
+      });
+      await seedColumnsItem();
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.text('×3')).dy,
+        lessThan(tester.getTopLeft(find.text('Charizard')).dy),
+      );
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-042 (c): a chosen Return/annual column draws a bar scaled to the displayed maximum',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues({
+        'collection_list_filter_columns': '["name","extra","returnAnnual"]',
+      });
+      final bought = DateTime.now().subtract(const Duration(days: 365));
+      for (final (id, name, paid, value) in [
+        ('card-1', 'Big', 100.0, 200.0),
+        ('card-2', 'Small', 100.0, 150.0),
+      ]) {
+        await db.upsertItem(
+          CollectionItemsCompanion.insert(
+            importedId: id,
+            name: name,
+            paidPerUnit: Value(paid),
+            valuePerUnit: Value(value),
+            dateAdded: Value(bought),
+          ),
+        );
+      }
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+
+      final bars = tester
+          .widgetList<LinearProgressIndicator>(find.byKey(const Key('return-bar')))
+          .map((b) => b.value!)
+          .toList();
+      expect(bars.length, 2);
+      expect(bars.reduce((a, b) => a > b ? a : b), closeTo(1.0, 1e-9));
+      expect(bars.reduce((a, b) => a < b ? a : b), lessThan(1.0));
+
+      await disposeAndFlush(tester);
+    },
+  );
 }

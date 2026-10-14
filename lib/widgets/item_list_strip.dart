@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../collection_search.dart';
 import '../database/database.dart';
+import 'columns_dialog.dart';
 
 /// REQ-042 (b), ADR-22 Option 1: the controls strip shared by the three
 /// item-list tabs -- matching count, matching value, percent of the whole
@@ -20,6 +23,9 @@ class ItemListStrip extends StatefulWidget {
     required this.sortKey,
     required this.ascending,
     required this.onChanged,
+    this.columns,
+    this.defaultColumns = const [],
+    this.onColumnsChanged,
   });
 
   final String prefsKeyPrefix;
@@ -28,6 +34,10 @@ class ItemListStrip extends StatefulWidget {
   final String sortKey;
   final bool ascending;
   final void Function(String key, bool ascending) onChanged;
+  /// REQ-042 (c): the chosen columns; null hides the columns button.
+  final List<String>? columns;
+  final List<String> defaultColumns;
+  final void Function(List<String> columns)? onColumnsChanged;
 
   @override
   State<ItemListStrip> createState() => _ItemListStripState();
@@ -36,6 +46,7 @@ class ItemListStrip extends StatefulWidget {
 class _ItemListStripState extends State<ItemListStrip> {
   String get _keyPref => '${widget.prefsKeyPrefix}_sort_key';
   String get _ascPref => '${widget.prefsKeyPrefix}_sort_asc';
+  String get _colsPref => '${widget.prefsKeyPrefix}_columns';
 
   @override
   void initState() {
@@ -49,8 +60,13 @@ class _ItemListStripState extends State<ItemListStrip> {
     // must fall back like a missing one, not throw.
     final key = prefs.get(_keyPref);
     final asc = prefs.get(_ascPref);
+    if (!mounted) return;
+    final cols = prefs.get(_colsPref);
+    if (cols != null) {
+      widget.onColumnsChanged?.call(parseColumnIds(cols, widget.defaultColumns));
+    }
     // An unknown, missing or wrong-typed key keeps the host's initial value.
-    if (!mounted || key is! String || !sortKeyIds.contains(key)) return;
+    if (key is! String || !sortKeyIds.contains(key)) return;
     widget.onChanged(key, asc is bool ? asc : true);
   }
 
@@ -59,6 +75,15 @@ class _ItemListStripState extends State<ItemListStrip> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyPref, key);
     await prefs.setBool(_ascPref, ascending);
+  }
+
+  Future<void> _pickColumns() async {
+    final chosen = await showColumnsDialog(context, selected: widget.columns!);
+    if (chosen == null) return;
+    final ids = chosen.isEmpty ? widget.defaultColumns : chosen;
+    widget.onColumnsChanged?.call(ids);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_colsPref, jsonEncode(ids));
   }
 
   double _total(List<CollectionItem> items) =>
@@ -103,6 +128,13 @@ class _ItemListStripState extends State<ItemListStrip> {
                 icon: Icon(widget.ascending ? Icons.arrow_upward : Icons.arrow_downward),
                 onPressed: () => _change(widget.sortKey, !widget.ascending),
               ),
+              if (widget.columns != null)
+                IconButton(
+                  key: const Key('columns-button'),
+                  tooltip: 'Columns',
+                  icon: const Icon(Icons.view_column),
+                  onPressed: _pickColumns,
+                ),
             ],
           ),
         ],

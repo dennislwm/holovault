@@ -5,6 +5,7 @@ import '../database/database.dart';
 import '../collection_search.dart';
 import '../widgets/search_filter_bar.dart';
 import '../widgets/item_list_strip.dart';
+import '../widgets/item_row.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
 import 'item_detail_screen.dart';
 
@@ -35,6 +36,9 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
   // REQ-042 (b): the screen's initial sort; the strip persists the user's.
   String _sortKey = SearchField.value.name;
   bool _sortAsc = false;
+  // REQ-042 (c): the screen's default columns; the strip persists the user's.
+  static const _defaultColumns = ['name', 'setName', 'value', 'paid'];
+  List<String> _columns = _defaultColumns;
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +71,9 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
           final allItems = snapshot.data ?? const [];
           final filtered = _filtered;
           final displayed = sortItems(filtered, _sortKey, _sortAsc);
+          final returnBarMax = _columns.contains('returnAnnual')
+              ? maxAbsReturnAnnual(displayed)
+              : 0.0;
 
           // REQ-015: cumulative running total over time, sorted by
           // dateAdded, matching ADR-12's "value trend over time" framing --
@@ -134,6 +141,9 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                   whole: allItems,
                   sortKey: _sortKey,
                   ascending: _sortAsc,
+                  columns: _columns,
+                  defaultColumns: _defaultColumns,
+                  onColumnsChanged: (cols) => setState(() => _columns = cols),
                   onChanged: (key, asc) => setState(() {
                     _sortKey = key;
                     _sortAsc = asc;
@@ -152,37 +162,10 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                         ),
                       ),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(item.name),
-                              Text(
-                                [
-                                  item.setName,
-                                  item.rarity,
-                                ].whereType<String>().join(' · '),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(item.valueTotal?.toStringAsFixed(2) ?? '--'),
-                            Text(
-                              'Paid: ${item.paidTotal?.toStringAsFixed(2) ?? '--'}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    child: ItemRow(
+                      item: item,
+                      columns: _columns,
+                      returnBarMax: returnBarMax,
                     ),
                   ),
             ],

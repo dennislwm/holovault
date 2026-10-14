@@ -11,6 +11,7 @@ import '../database/database.dart';
 import '../import_schema.dart';
 import '../widgets/search_filter_bar.dart';
 import '../widgets/item_list_strip.dart';
+import '../widgets/item_row.dart';
 import 'item_detail_screen.dart';
 
 // REQ-042: moved to collection_search.dart so the shared strip doesn't import
@@ -309,6 +310,8 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
   // REQ-042 (b): the screen's initial sort; the strip persists the user's.
   String _sortKey = nameSortKey;
   bool _sortAsc = true;
+  static const _defaultColumns = ['name', 'extra', 'quantity'];
+  List<String> _columns = _defaultColumns;
 
   @override
   void initState() {
@@ -319,6 +322,9 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
   @override
   Widget build(BuildContext context) {
     final displayed = sortItems(_filtered, _sortKey, _sortAsc);
+    final returnBarMax = _columns.contains('returnAnnual')
+        ? maxAbsReturnAnnual(displayed)
+        : 0.0;
     return ListView.builder(
       itemCount: displayed.length + 3,
       itemBuilder: (context, index) {
@@ -339,6 +345,9 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
             whole: widget.items,
             sortKey: _sortKey,
             ascending: _sortAsc,
+            columns: _columns,
+            defaultColumns: _defaultColumns,
+            onColumnsChanged: (cols) => setState(() => _columns = cols),
             onChanged: (key, asc) => setState(() {
               _sortKey = key;
               _sortAsc = asc;
@@ -348,18 +357,12 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
         final item = displayed[index - 3];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Text(
-                item.name.isEmpty ? '?' : item.name[0].toUpperCase(),
-              ),
+          child: InkWell(
+            child: ItemRow(
+              item: item,
+              columns: _columns,
+              returnBarMax: returnBarMax,
             ),
-            title: Text(item.name),
-            subtitle: item.extra == null ? null : Text(item.extra!),
-            trailing: item.quantity == null
-                ? null
-                : Chip(label: Text('×${item.quantity}')),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => ItemDetailScreen(
