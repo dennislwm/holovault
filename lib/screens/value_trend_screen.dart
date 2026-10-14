@@ -2,7 +2,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../database/database.dart';
+import '../collection_search.dart';
 import '../widgets/search_filter_bar.dart';
+import '../widgets/item_list_strip.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
 import 'item_detail_screen.dart';
 
@@ -30,6 +32,9 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
   // didUpdateWidget would read as "items changed" and recompute again,
   // looping forever under pumpAndSettle.
   late final Stream<List<CollectionItem>> _itemsStream = widget.database.watchAllItems();
+  // REQ-042 (b): the screen's initial sort; the strip persists the user's.
+  String _sortKey = SearchField.value.name;
+  bool _sortAsc = false;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +66,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
           }
           final allItems = snapshot.data ?? const [];
           final filtered = _filtered;
+          final displayed = sortItems(filtered, _sortKey, _sortAsc);
 
           // REQ-015: cumulative running total over time, sorted by
           // dateAdded, matching ADR-12's "value trend over time" framing --
@@ -122,11 +128,18 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                         ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Matching items · ${filtered.length}',
-                  style: Theme.of(context).textTheme.labelSmall,
+                ItemListStrip(
+                  prefsKeyPrefix: 'value_trend_filter',
+                  filtered: filtered,
+                  whole: allItems,
+                  sortKey: _sortKey,
+                  ascending: _sortAsc,
+                  onChanged: (key, asc) => setState(() {
+                    _sortKey = key;
+                    _sortAsc = asc;
+                  }),
                 ),
-                for (final (i, item) in filtered.indexed)
+                for (final (i, item) in displayed.indexed)
                   InkWell(
                     key: Key('value-trend-row-$i'),
                     // REQ-042 (a): same browse-then-open as the Collection tab.
@@ -134,7 +147,7 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
                       MaterialPageRoute(
                         builder: (_) => ItemDetailScreen(
                           database: widget.database,
-                          items: filtered,
+                          items: displayed,
                           initialIndex: i,
                         ),
                       ),

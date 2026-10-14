@@ -280,4 +280,34 @@ void main() {
       expect(withBase, isNot(contains(SearchField.returnAnnual)));
     });
   });
+
+  group('REQ-042 (b): sortItems', () {
+    Future<List<CollectionItem>> seed() async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: '1', name: 'b', valueTotal: const Value(20)),
+      );
+      await db.upsertItem(CollectionItemsCompanion.insert(importedId: '2', name: 'A'));
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: '3', name: 'C', valueTotal: const Value(10)),
+      );
+      return db.select(db.collectionItems).get();
+    }
+
+    test('an item with no value sorts last in both directions', () async {
+      final items = await seed();
+
+      final asc = sortItems(items, SearchField.value.name, true);
+      final desc = sortItems(items, SearchField.value.name, false);
+
+      expect(asc.map((i) => i.name), ['C', 'b', 'A']);
+      expect(desc.map((i) => i.name), ['b', 'C', 'A']);
+    });
+
+    test('name sorts case-insensitively and an unknown key keeps the order', () async {
+      final items = await seed();
+
+      expect(sortItems(items, nameSortKey, true).map((i) => i.name), ['A', 'b', 'C']);
+      expect(sortItems(items, 'no_such_key', true), items);
+    });
+  });
 }

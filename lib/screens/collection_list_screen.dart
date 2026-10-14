@@ -10,7 +10,12 @@ import '../collection_search.dart';
 import '../database/database.dart';
 import '../import_schema.dart';
 import '../widgets/search_filter_bar.dart';
+import '../widgets/item_list_strip.dart';
 import 'item_detail_screen.dart';
+
+// REQ-042: moved to collection_search.dart so the shared strip doesn't import
+// a screen; re-exported for existing importers.
+export '../collection_search.dart' show collectionDistribution;
 
 /// ADR-06, Option A: acquires a file path via the native document picker.
 /// Scope note (ADR-06): acquisition only -- parsing the picked file into
@@ -114,31 +119,6 @@ String schemaErrorMessage(Object? error) {
       ? "This collection database is from an unrecognized app version and "
             "can't be opened."
       : 'Something went wrong loading your collection.';
-}
-
-/// ADR-17, Option 1: category totals for the Collection Distribution card.
-/// Derivation confirmed against real data (see ADR-17 Decision Drivers):
-/// `rarity == 'Sealed'` -> Sealed; else `gradeType == 'Ungraded'` ->
-/// Ungraded; else -> Graded. Sums `valueTotal`, treating a null total as 0.
-///
-/// REQ-032: the three buckets are exhaustive by construction -- the
-/// ternary chain's final branch is an unconditional `-> Graded`, not a
-/// null/skip case, so every item lands in exactly one bucket regardless
-/// of its `rarity`/`gradeType` values. Summing all three bucket totals
-/// therefore equals the sum over every item, making this function safe
-/// to reuse for a whole-list total (REQ-032's matching-value/percentage),
-/// not just the three-way distribution card it was originally written for.
-Map<String, double> collectionDistribution(List<CollectionItem> items) {
-  final totals = {'Sealed': 0.0, 'Graded': 0.0, 'Ungraded': 0.0};
-  for (final item in items) {
-    final category = item.rarity == 'Sealed'
-        ? 'Sealed'
-        : item.gradeType == 'Ungraded'
-        ? 'Ungraded'
-        : 'Graded';
-    totals[category] = totals[category]! + (item.valueTotal ?? 0);
-  }
-  return totals;
 }
 
 /// ADR-17, Option 1: stacked rows, each a category label + $ amount + %
@@ -326,6 +306,9 @@ class _FilterableCollectionList extends StatefulWidget {
 
 class _FilterableCollectionListState extends State<_FilterableCollectionList> {
   List<CollectionItem> _filtered = const [];
+  // REQ-042 (b): the screen's initial sort; the strip persists the user's.
+  String _sortKey = nameSortKey;
+  bool _sortAsc = true;
 
   @override
   void initState() {
@@ -335,8 +318,9 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
 
   @override
   Widget build(BuildContext context) {
+    final displayed = sortItems(_filtered, _sortKey, _sortAsc);
     return ListView.builder(
-      itemCount: _filtered.length + 3,
+      itemCount: displayed.length + 3,
       itemBuilder: (context, index) {
         if (index == 0) {
           return CollectionDistributionCard(items: widget.items);
@@ -349,29 +333,19 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
           );
         }
         if (index == 2) {
-          final matchingValue = collectionDistribution(_filtered).values.fold(
-            0.0,
-            (sum, v) => sum + v,
-          );
-          final totalValue = collectionDistribution(widget.items).values.fold(
-            0.0,
-            (sum, v) => sum + v,
-          );
-          final pct = totalValue == 0 ? 0.0 : matchingValue / totalValue * 100;
-          final style = Theme.of(context).textTheme.labelSmall;
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('${_filtered.length} matching items', style: style),
-                Text('\$${matchingValue.toStringAsFixed(2)}', style: style),
-                Text('${pct.toStringAsFixed(1)}%', style: style),
-              ],
-            ),
+          return ItemListStrip(
+            prefsKeyPrefix: 'collection_list_filter',
+            filtered: _filtered,
+            whole: widget.items,
+            sortKey: _sortKey,
+            ascending: _sortAsc,
+            onChanged: (key, asc) => setState(() {
+              _sortKey = key;
+              _sortAsc = asc;
+            }),
           );
         }
-        final item = _filtered[index - 3];
+        final item = displayed[index - 3];
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: ListTile(
@@ -390,7 +364,7 @@ class _FilterableCollectionListState extends State<_FilterableCollectionList> {
               MaterialPageRoute(
                 builder: (_) => ItemDetailScreen(
                   database: widget.database,
-                  items: _filtered,
+                  items: displayed,
                   initialIndex: index - 3,
                 ),
               ),

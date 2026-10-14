@@ -3,7 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../annualized_return.dart';
 import '../database/database.dart';
+import '../collection_search.dart';
 import '../widgets/search_filter_bar.dart';
+import '../widgets/item_list_strip.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
 import 'item_detail_screen.dart';
 
@@ -37,8 +39,10 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
   late final Stream<List<CollectionItem>> _itemsStream = widget.database.watchAllItems();
   int _limit = _defaultLimit;
   bool _loadedPersisted = false;
-  int _sortColumnIndex = 1;
-  bool _sortAscending = false;
+  // REQ-042 (b): the screen's initial sort (Return descending, as before);
+  // the strip persists the user's.
+  String _sortKey = SearchField.returnAnnual.name;
+  bool _sortAsc = false;
 
   @override
   void initState() {
@@ -57,13 +61,6 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
   Future<void> _saveParams() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_limitKey, _limit);
-  }
-
-  void _sortBy(int columnIndex) {
-    setState(() {
-      _sortAscending = columnIndex == _sortColumnIndex ? !_sortAscending : true;
-      _sortColumnIndex = columnIndex;
-    });
   }
 
   @override
@@ -99,27 +96,13 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
           }
           final allItems = snapshot.data ?? const [];
 
-          final ranked = computeAnnualizedReturns(_filtered, limit: _limit);
-          // Re-apply the user's chosen sort (default: Return descending,
-          // matching computeAnnualizedReturns' own default order) on top
-          // of the already-filtered/limited ranked list.
-          int compare(AnnualizedReturn a, AnnualizedReturn b) {
-            switch (_sortColumnIndex) {
-              case 0:
-                return a.item.name.compareTo(b.item.name);
-              case 2:
-                return (a.item.paidPerUnit ?? 0).compareTo(b.item.paidPerUnit ?? 0);
-              case 3:
-                return (a.item.valuePerUnit ?? 0).compareTo(b.item.valuePerUnit ?? 0);
-              case 4:
-                return a.daysHeld.compareTo(b.daysHeld);
-              case 1:
-              default:
-                return a.percent.compareTo(b.percent);
-            }
-          }
-
-          ranked.sort((a, b) => _sortAscending ? compare(a, b) : compare(b, a));
+          // Top N by return, then shown in the strip's chosen order.
+          final top = computeAnnualizedReturns(_filtered, limit: _limit);
+          final byItem = {for (final r in top) r.item: r};
+          final ranked = [
+            for (final i in sortItems([for (final r in top) r.item], _sortKey, _sortAsc))
+              byItem[i]!,
+          ];
           final maxPercent = ranked.isEmpty
               ? 1.0
               : ranked.map((r) => r.percent.abs()).reduce((a, b) => a > b ? a : b);
@@ -131,6 +114,18 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                 prefsKeyPrefix: 'best_returns_filter',
                 items: allItems,
                 onFiltered: (result) => setState(() => _filtered = result),
+              ),
+              const SizedBox(height: 12),
+              ItemListStrip(
+                prefsKeyPrefix: 'best_returns_filter',
+                filtered: _filtered,
+                whole: allItems,
+                sortKey: _sortKey,
+                ascending: _sortAsc,
+                onChanged: (key, asc) => setState(() {
+                  _sortKey = key;
+                  _sortAsc = asc;
+                }),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -183,34 +178,13 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
-                    sortColumnIndex: _sortColumnIndex,
-                    sortAscending: _sortAscending,
                     showCheckboxColumn: false,
-                    columns: [
-                      DataColumn(
-                        label: const Text('Item'),
-                        onSort: (i, _) => _sortBy(i),
-                      ),
-                      DataColumn(
-                        label: const Text('Return'),
-                        numeric: true,
-                        onSort: (i, _) => _sortBy(i),
-                      ),
-                      DataColumn(
-                        label: const Text('Paid'),
-                        numeric: true,
-                        onSort: (i, _) => _sortBy(i),
-                      ),
-                      DataColumn(
-                        label: const Text('Value'),
-                        numeric: true,
-                        onSort: (i, _) => _sortBy(i),
-                      ),
-                      DataColumn(
-                        label: const Text('Days'),
-                        numeric: true,
-                        onSort: (i, _) => _sortBy(i),
-                      ),
+                    columns: const [
+                      DataColumn(label: Text('Item')),
+                      DataColumn(label: Text('Return'), numeric: true),
+                      DataColumn(label: Text('Paid'), numeric: true),
+                      DataColumn(label: Text('Value'), numeric: true),
+                      DataColumn(label: Text('Days'), numeric: true),
                     ],
                     rows: [
                       for (final (i, r) in ranked.indexed)

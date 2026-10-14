@@ -109,7 +109,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add').last);
       await tester.pumpAndSettle();
-      expect(find.text('Matching items · 1'), findsOneWidget);
+      expect(find.text('1 matching items'), findsOneWidget);
 
       // Switch to Collection, then back to Value trend -- with a pushed
       // AppBar/Navigator.push this would rebuild the screen from scratch
@@ -121,7 +121,7 @@ void main() {
       await tester.tap(find.text('Value trend'));
       await tester.pumpAndSettle();
       expect(find.text('Rarity = Holo'), findsOneWidget);
-      expect(find.text('Matching items · 1'), findsOneWidget);
+      expect(find.text('1 matching items'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
@@ -496,7 +496,8 @@ void main() {
       );
       await tester.pumpWidget(HolovaultApp(database: db));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Charizard'));
+      // REQ-042 (b): Collection now defaults to Name ascending, so Blastoise is 1.
+      await tester.tap(find.text('Blastoise'));
       await tester.pumpAndSettle();
 
       expect(find.text('1 / 2'), findsOneWidget);
@@ -831,6 +832,104 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Charizard'), findsOneWidget);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-042 (b): the sort picker and direction toggle reorder rows and persist across a restart',
+    (WidgetTester tester) async {
+      for (final (id, name, value) in [
+        ('card-1', 'Aa', 10.0),
+        ('card-2', 'Bb', null),
+        ('card-3', 'Cc', 30.0),
+      ]) {
+        await db.upsertItem(
+          CollectionItemsCompanion.insert(
+            importedId: id,
+            name: name,
+            valueTotal: Value(value),
+          ),
+        );
+      }
+      List<String> order() => [
+        for (final n in ['Aa', 'Bb', 'Cc']) n,
+      ]..sort((a, b) => tester
+          .getTopLeft(find.text(a))
+          .dy
+          .compareTo(tester.getTopLeft(find.text(b)).dy));
+
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      expect(order(), ['Aa', 'Bb', 'Cc']); // default: Name ascending
+
+      await tester.tap(find.byKey(const Key('sort-key-picker')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Value').last);
+      await tester.pumpAndSettle();
+      expect(order(), ['Aa', 'Cc', 'Bb']); // no value last
+
+      await tester.tap(find.byKey(const Key('sort-direction')));
+      await tester.pumpAndSettle();
+      expect(order(), ['Cc', 'Aa', 'Bb']); // no value still last
+
+      // Restart: a fresh app reads the persisted key and direction.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      expect(order(), ['Cc', 'Aa', 'Bb']);
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  for (final stored in <Map<String, Object>>[
+    {'collection_list_filter_sort_key': 'bogus'},
+    {'collection_list_filter_sort_key': 7, 'collection_list_filter_sort_asc': 'x'},
+  ]) {
+    testWidgets(
+      'REQ-042 (b): a ${stored.containsKey("collection_list_filter_sort_asc") ? "wrong-typed" : "unknown"} stored sort falls back to the initial order',
+      (WidgetTester tester) async {
+        SharedPreferences.setMockInitialValues(stored);
+        await db.upsertItem(CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Bb'));
+        await db.upsertItem(CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Aa'));
+        await tester.pumpWidget(HolovaultApp(database: db));
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.getTopLeft(find.text('Aa')).dy,
+          lessThan(tester.getTopLeft(find.text('Bb')).dy),
+        );
+
+        await disposeAndFlush(tester);
+      },
+    );
+  }
+
+  testWidgets(
+    'REQ-042 (b): changing the sort key resets a descending direction to ascending',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Aa', valueTotal: const Value(10)),
+      );
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Bb', valueTotal: const Value(30)),
+      );
+      await tester.pumpWidget(HolovaultApp(database: db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sort-direction'))); // Name descending
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sort-key-picker')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Value').last);
+      await tester.pumpAndSettle();
+
+      // Value ascending: Aa (10) above Bb (30).
+      expect(
+        tester.getTopLeft(find.text('Aa')).dy,
+        lessThan(tester.getTopLeft(find.text('Bb')).dy),
+      );
 
       await disposeAndFlush(tester);
     },

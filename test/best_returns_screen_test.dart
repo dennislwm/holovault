@@ -169,6 +169,10 @@ void main() {
   testWidgets(
     'REQ-028: tapping the Item column header sorts alphabetically instead of by return',
     (WidgetTester tester) async {
+      // REQ-042 (b): the strip is taller; keep every row inside the viewport.
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await db.upsertItem(
         CollectionItemsCompanion.insert(
           importedId: 'card-1',
@@ -196,7 +200,10 @@ void main() {
       final beforeRows = tester.widget<DataTable>(find.byType(DataTable)).rows;
       expect(beforeRows.first.cells.first.child, isA<Text>());
 
-      await tester.tap(find.text('Item'));
+      // REQ-042 (b): the strip's sort picker replaces the header sort.
+      await tester.tap(find.byKey(const Key('sort-key-picker')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Name').last);
       await tester.pumpAndSettle();
 
       final afterRows = tester.widget<DataTable>(find.byType(DataTable)).rows;

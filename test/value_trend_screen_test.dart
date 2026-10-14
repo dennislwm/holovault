@@ -61,6 +61,10 @@ void main() {
   testWidgets(
     'REQ-015: shows the cumulative value trend chart and total',
     (WidgetTester tester) async {
+      // REQ-042 (b): the strip is taller; keep every row inside the viewport.
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await db.upsertItem(
         CollectionItemsCompanion.insert(
           importedId: 'card-1',
@@ -91,7 +95,7 @@ void main() {
         '150.00',
       );
       expect(find.byType(LineChart), findsOneWidget);
-      expect(find.text('Matching items · 2'), findsOneWidget);
+      expect(find.text('2 matching items'), findsOneWidget);
       expect(find.text('Charizard'), findsOneWidget);
       expect(find.text('Blastoise'), findsOneWidget);
 
@@ -244,7 +248,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Matching items · 0'), findsOneWidget);
+      expect(find.text('0 matching items'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
@@ -298,6 +302,10 @@ void main() {
   testWidgets(
     'the matching items list shows each item\'s paid total alongside its value total',
     (WidgetTester tester) async {
+      // REQ-042 (b): the strip is taller; keep every row inside the viewport.
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await db.upsertItem(
         CollectionItemsCompanion.insert(
           importedId: 'card-1',
@@ -361,11 +369,11 @@ void main() {
       // Both items match Grade type = PSA before the exclude-sealed clause
       // is added.
       await addClause(tester, field: 'Grade type', op: '=', value: 'PSA');
-      expect(find.text('Matching items · 2'), findsOneWidget);
+      expect(find.text('2 matching items'), findsOneWidget);
 
       await addClause(tester, field: 'Rarity', op: '!=', value: 'Sealed');
 
-      expect(find.text('Matching items · 1'), findsOneWidget);
+      expect(find.text('1 matching items'), findsOneWidget);
       expect(find.text('Charizard VMAX'), findsOneWidget);
       expect(find.text('Base Set Booster Box'), findsNothing);
 
@@ -377,6 +385,10 @@ void main() {
     'REQ-021: a dated item with no valueTotal/paidTotal appears on the x-axis '
         'and contributes 0 to both running totals',
     (WidgetTester tester) async {
+      // REQ-042 (b): the strip is taller; keep every row inside the viewport.
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await db.upsertItem(
         CollectionItemsCompanion.insert(
           importedId: 'card-1',
@@ -410,7 +422,7 @@ void main() {
       // All three appear -- the middle item's missing valueTotal/paidTotal
       // does not exclude it from the x-axis now that withDates only
       // requires dateAdded (REQ-020 widened the filter).
-      expect(find.text('Matching items · 3'), findsOneWidget);
+      expect(find.text('3 matching items'), findsOneWidget);
       expect(find.text('Undated-value Pikachu'), findsOneWidget);
 
       // Running totals: the middle item contributes 0 to each, so the
@@ -446,11 +458,11 @@ void main() {
       await tester.pumpAndSettle();
 
       await addClause(tester, field: 'Rarity', op: '=', value: 'Sealed');
-      expect(find.text('Matching items · 1'), findsOneWidget);
+      expect(find.text('1 matching items'), findsOneWidget);
 
       await addClause(tester, field: 'Rarity', op: '!=', value: 'Sealed');
 
-      expect(find.text('Matching items · 0'), findsOneWidget);
+      expect(find.text('0 matching items'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },

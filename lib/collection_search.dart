@@ -203,3 +203,76 @@ List<String> distinctValuesFor(SearchField field, List<CollectionItem> narrowed)
   }
   return values.toList()..sort();
 }
+
+/// REQ-042 (b), ADR-22: list sort keys are every [SearchField] member plus
+/// two picker-owned text keys. Stored by string id, so like
+/// [SearchField] these ids are never renamed.
+const nameSortKey = 'name';
+const extraSortKey = 'extra';
+
+/// Name and Extra first (they are the row identity), then the fields in
+/// [SearchField] declaration order.
+final List<String> sortKeyIds = [
+  nameSortKey,
+  extraSortKey,
+  for (final f in SearchField.values) f.name,
+];
+
+String sortKeyLabel(String id) => switch (id) {
+      nameSortKey => 'Name',
+      extraSortKey => 'Extra',
+      _ => SearchField.values.byName(id).label,
+    };
+
+/// REQ-042 (b): [items] ordered by [key], an item with no value for it
+/// always last (ascending or descending). Unknown [key] returns the list
+/// order unchanged. Stable: equal keys keep their incoming order.
+List<CollectionItem> sortItems(
+  List<CollectionItem> items,
+  String key,
+  bool ascending, {
+  DateTime? now,
+}) {
+  if (!sortKeyIds.contains(key)) return items;
+  final today = now ?? DateTime.now();
+  Comparable? valueOf(CollectionItem i) {
+    if (key == nameSortKey) return i.name.toLowerCase();
+    if (key == extraSortKey) return i.extra?.toLowerCase();
+    final field = SearchField.values.byName(key);
+    if (field.isText) return textFieldValue(i, field)?.toLowerCase();
+    return _numericFieldValue(i, field, today);
+  }
+
+  final keyed = [for (final i in items) (i, valueOf(i))];
+  final present = [for (final k in keyed) if (k.$2 != null) k]
+    ..sort((a, b) => ascending ? a.$2!.compareTo(b.$2) : b.$2!.compareTo(a.$2));
+  return [
+    for (final k in present) k.$1,
+    for (final k in keyed) if (k.$2 == null) k.$1,
+  ];
+}
+
+/// ADR-17, Option 1: category totals for the Collection Distribution card.
+/// Derivation confirmed against real data (see ADR-17 Decision Drivers):
+/// `rarity == 'Sealed'` -> Sealed; else `gradeType == 'Ungraded'` ->
+/// Ungraded; else -> Graded. Sums `valueTotal`, treating a null total as 0.
+///
+/// REQ-032: the three buckets are exhaustive by construction -- the
+/// ternary chain's final branch is an unconditional `-> Graded`, not a
+/// null/skip case, so every item lands in exactly one bucket regardless
+/// of its `rarity`/`gradeType` values. Summing all three bucket totals
+/// therefore equals the sum over every item, making this function safe
+/// to reuse for a whole-list total (REQ-032's matching-value/percentage),
+/// not just the three-way distribution card it was originally written for.
+Map<String, double> collectionDistribution(List<CollectionItem> items) {
+  final totals = {'Sealed': 0.0, 'Graded': 0.0, 'Ungraded': 0.0};
+  for (final item in items) {
+    final category = item.rarity == 'Sealed'
+        ? 'Sealed'
+        : item.gradeType == 'Ungraded'
+        ? 'Ungraded'
+        : 'Graded';
+    totals[category] = totals[category]! + (item.valueTotal ?? 0);
+  }
+  return totals;
+}
