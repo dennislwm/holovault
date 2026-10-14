@@ -6,6 +6,7 @@ import '../database/database.dart';
 import '../collection_search.dart';
 import '../widgets/search_filter_bar.dart';
 import '../widgets/item_list_strip.dart';
+import '../widgets/item_row.dart';
 import 'collection_list_screen.dart' show schemaErrorMessage;
 import 'item_detail_screen.dart';
 
@@ -14,8 +15,8 @@ const _limitKey = 'best_returns_limit';
 const _defaultLimit = 5;
 
 /// ADR-16 (superseded by ADR-19), ADR-19 Option 1: ranks collection items by
-/// annualized return (CAGR) in a sortable DataTable whose "Return" column
-/// combines a proportional-width bar with its percent text in one DataCell.
+/// annualized return (CAGR) as shared item rows (ADR-22) whose Return/annual cell
+/// is the percent text plus a proportional-width bar.
 /// Filtering is the shared [SearchFilterBar] (search term + clause
 /// builder), same as [ValueTrendScreen]/[CollectionListScreen]; `limit`
 /// stays this screen's own post-rank `Stepper`, out of ADR-19's scope
@@ -43,6 +44,15 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
   // the strip persists the user's.
   String _sortKey = SearchField.returnAnnual.name;
   bool _sortAsc = false;
+  // REQ-042 (d): the screen's default columns; the strip persists the user's.
+  static const _defaultColumns = [
+    'name',
+    'returnAnnual',
+    'paidPerUnit',
+    'valuePerUnit',
+    'daysHeld',
+  ];
+  List<String> _columns = _defaultColumns;
 
   @override
   void initState() {
@@ -103,9 +113,7 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
             for (final i in sortItems([for (final r in top) r.item], _sortKey, _sortAsc))
               byItem[i]!,
           ];
-          final maxPercent = ranked.isEmpty
-              ? 1.0
-              : ranked.map((r) => r.percent.abs()).reduce((a, b) => a > b ? a : b);
+          final returnBarMax = maxAbsReturnAnnual([for (final r in ranked) r.item]);
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -122,6 +130,9 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                 whole: allItems,
                 sortKey: _sortKey,
                 ascending: _sortAsc,
+                columns: _columns,
+                defaultColumns: _defaultColumns,
+                onColumnsChanged: (cols) => setState(() => _columns = cols),
                 onChanged: (key, asc) => setState(() {
                   _sortKey = key;
                   _sortAsc = asc;
@@ -136,7 +147,7 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Limit', style: Theme.of(context).textTheme.bodySmall),
+                      Text('Top N by return', style: Theme.of(context).textTheme.bodySmall),
                       IconButton(
                         key: const Key('best-returns-limit-minus'),
                         icon: const Icon(Icons.remove_circle_outline),
@@ -175,70 +186,25 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
                   child: Center(child: Text('No items match these filters/params')),
                 )
               else
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    showCheckboxColumn: false,
-                    columns: const [
-                      DataColumn(label: Text('Item')),
-                      DataColumn(label: Text('Return'), numeric: true),
-                      DataColumn(label: Text('Paid'), numeric: true),
-                      DataColumn(label: Text('Value'), numeric: true),
-                      DataColumn(label: Text('Days'), numeric: true),
-                    ],
-                    rows: [
-                      for (final (i, r) in ranked.indexed)
-                        DataRow(
-                          // REQ-042 (a): open the item, paging the displayed (sorted) list.
-                          onSelectChanged: (_) => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ItemDetailScreen(
-                                database: widget.database,
-                                items: [for (final x in ranked) x.item],
-                                initialIndex: i,
-                              ),
-                            ),
-                          ),
-                          cells: [
-                            DataCell(Text(r.item.name)),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    key: const Key('best-returns-bar'),
-                                    width: 32,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(3),
-                                    ),
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.centerLeft,
-                                      widthFactor: maxPercent == 0
-                                          ? 0
-                                          : (r.percent.abs() / maxPercent).clamp(0.0, 1.0),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context).colorScheme.primary,
-                                          borderRadius: BorderRadius.circular(3),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text('${r.percent.toStringAsFixed(2)}%'),
-                                ],
-                              ),
-                            ),
-                            DataCell(Text(r.item.paidPerUnit?.toStringAsFixed(2) ?? '--')),
-                            DataCell(Text(r.item.valuePerUnit?.toStringAsFixed(2) ?? '--')),
-                            DataCell(Text('${r.daysHeld}')),
-                          ],
+                for (final (i, r) in ranked.indexed)
+                  InkWell(
+                    key: Key('best-returns-row-$i'),
+                    // REQ-042 (a): open the item, paging the displayed (sorted) list.
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ItemDetailScreen(
+                          database: widget.database,
+                          items: [for (final x in ranked) x.item],
+                          initialIndex: i,
                         ),
-                    ],
+                      ),
+                    ),
+                    child: ItemRow(
+                      item: r.item,
+                      columns: _columns,
+                      returnBarMax: returnBarMax,
+                    ),
                   ),
-                ),
             ],
           );
         },

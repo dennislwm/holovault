@@ -24,11 +24,10 @@ class ItemRow extends StatelessWidget {
 
   // Value and quantity read on their own; every other trailing cell carries
   // its label so two numbers are never ambiguous.
-  Widget _trailing(BuildContext context, String id) {
-    final style = Theme.of(context).textTheme.bodySmall;
+  Widget _cell(BuildContext context, String id, {required bool trailing, TextStyle? style}) {
     final text = cellText(item, id) ?? '--';
-    final bare = id == SearchField.value.name || id == SearchField.quantity.name;
-    final label = Text(bare ? text : '${sortKeyLabel(id)}: $text', style: bare ? null : style);
+    final bare = !trailing || id == SearchField.value.name || id == SearchField.quantity.name;
+    final label = Text(bare ? text : '${sortKeyLabel(id)}: $text', style: style);
     if (id != SearchField.returnAnnual.name) return label;
     final pct = annualizedReturnPercent(item, DateTime.now());
     final factor = pct == null || returnBarMax == 0
@@ -50,7 +49,7 @@ class ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = columns.length > 1 ? cellText(item, columns[1]) : null;
+    final small = Theme.of(context).textTheme.bodySmall;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
@@ -59,15 +58,19 @@ class ItemRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(cellText(item, columns.first) ?? '--'),
-                if (subtitle != null)
-                  Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                _cell(context, columns.first, trailing: false),
+                if (columns.length > 1 &&
+                    (columns[1] == SearchField.returnAnnual.name ||
+                        cellText(item, columns[1]) != null))
+                  _cell(context, columns[1], trailing: false, style: small),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: [for (final id in columns.skip(2)) _trailing(context, id)],
+            children: [
+              for (final id in columns.skip(2)) _cell(context, id, trailing: true, style: small),
+            ],
           ),
         ],
       ),

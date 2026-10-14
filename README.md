@@ -55,8 +55,7 @@ A free-account certificate expires after 7 days -- re-run `make run` weekly to r
 Requires: [ADR-22](https://github.com/dennislwm/holovault/wiki/decisions/adr-22-shared-item-list)
 
 On the Collection, Value trend and Best Returns tabs the strip above the
-list sets the sort key and direction. On Collection and Value trend its
-Columns button opens a dialog:
+list sets the sort key and direction, and its Columns button opens a dialog:
 
 1. Tick the fields a row should show.
 2. Drag the handles to reorder: the first is the row title, the second the

@@ -82,12 +82,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ranked · 2'), findsOneWidget);
-      expect(find.byType(DataTable), findsOneWidget);
       expect(find.text('Fast grower'), findsOneWidget);
       expect(find.text('Slow grower'), findsOneWidget);
       expect(find.textContaining('100.00'), findsWidgets);
-      expect(find.text('200'), findsWidgets);
-      expect(find.byKey(const Key('best-returns-bar')), findsNWidgets(2));
+      expect(find.textContaining('200'), findsWidgets);
+      expect(find.text('Top N by return'), findsOneWidget);
+      expect(find.byKey(const Key('return-bar')), findsNWidgets(2));
 
       await disposeAndFlush(tester);
     },
@@ -197,8 +197,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Default sort is by Return descending -- Zorua (higher %) first.
-      final beforeRows = tester.widget<DataTable>(find.byType(DataTable)).rows;
-      expect(beforeRows.first.cells.first.child, isA<Text>());
+      expect(
+        tester.getTopLeft(find.text('Zorua')).dy,
+        lessThan(tester.getTopLeft(find.text('Abra')).dy),
+      );
 
       // REQ-042 (b): the strip's sort picker replaces the header sort.
       await tester.tap(find.byKey(const Key('sort-key-picker')));
@@ -206,9 +208,10 @@ void main() {
       await tester.tap(find.text('Name').last);
       await tester.pumpAndSettle();
 
-      final afterRows = tester.widget<DataTable>(find.byType(DataTable)).rows;
-      final firstCellText = (afterRows.first.cells.first.child as Text).data;
-      expect(firstCellText, 'Abra');
+      expect(
+        tester.getTopLeft(find.text('Abra')).dy,
+        lessThan(tester.getTopLeft(find.text('Zorua')).dy),
+      );
 
       await disposeAndFlush(tester);
     },
@@ -245,6 +248,38 @@ void main() {
 
       expect(find.text('Item detail'), findsOneWidget);
       expect(find.text('Slow grower'), findsNWidgets(2));
+
+      await disposeAndFlush(tester);
+    },
+  );
+
+  testWidgets(
+    'REQ-042 (d): the columns dialog changes the ranked rows on Best Returns',
+    (WidgetTester tester) async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(
+          importedId: 'card-1',
+          name: 'Grower',
+          paidPerUnit: const Value(100.0),
+          valuePerUnit: const Value(150.0),
+          dateAdded: Value(DateTime.now().subtract(const Duration(days: 200))),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(home: BestReturnsScreen(database: db)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Days held'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('columns-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(CheckboxListTile, 'Days held'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Apply'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Days held'), findsNothing);
+      expect(find.text('Grower'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
