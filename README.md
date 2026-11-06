@@ -63,6 +63,18 @@ list sets the sort key and direction, and its Columns button opens a dialog:
 3. Apply. The choice is remembered per tab; unticking everything restores
    that tab's default.
 
+## Export and import custom fields
+
+Requires: [ADR-23](https://github.com/dennislwm/holovault/wiki/decisions/adr-23-export-import-custom-fields)
+
+On the Collection tab, the overflow menu (three dots, after the Import icon)
+carries two items that move only the custom-field values, not the collection:
+
+1. **Export custom fields** -- pick a place in the save dialog; the file is
+   `holovault-custom-fields-YYYY-MM-DD.json`.
+2. **Import custom fields** -- pick such a file. The whole file is checked
+   first; if anything is wrong the import is refused and nothing is written.
+
 ## Override columns
 
 Requires: [ADR-03](https://github.com/dennislwm/holovault/wiki/decisions/adr-03-override-schema-extension)

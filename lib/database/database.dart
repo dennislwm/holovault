@@ -177,6 +177,38 @@ class AppDatabase extends _$AppDatabase {
     await saveCustomFields(importedId, values, registry: registry);
   });
 
+  /// REQ-047: every overrides row (dormant ones included), read from the
+  /// table directly, by importedId, with the registry's typed raw values.
+  Future<List<({String importedId, Map<String, Object?> values})>>
+  overrideRows({List<CustomColumn>? registry}) async {
+    final cols = registry ?? customColumns;
+    final key = collectionItemOverrides.importedId;
+    final q = selectOnly(collectionItemOverrides)
+      ..addColumns([key, for (final c in cols) c.column(collectionItemOverrides)])
+      ..orderBy([OrderingTerm.asc(key)]);
+    return [
+      for (final r in await q.get())
+        (
+          importedId: r.read(key)!,
+          values: {
+            for (final c in cols)
+              c.name: r.read(c.column(collectionItemOverrides)),
+          },
+        ),
+    ];
+  }
+
+  /// REQ-047: upserts every parsed row in ONE transaction; writes only the
+  /// overrides table. Only keys present in a row's values are touched.
+  Future<void> importCustomFieldRows(
+    List<({String importedId, Map<String, Object?> values})> rows, {
+    List<CustomColumn>? registry,
+  }) => transaction(() async {
+    for (final r in rows) {
+      await saveCustomFields(r.importedId, r.values, registry: registry);
+    }
+  });
+
   /// REQ-043 (b): raw stored values of one overrides column, over live and
   /// hidden (no longer imported) rows alike; feed to `suggestionList`.
   Future<List<String?>> storedValues(CustomColumn c) async {

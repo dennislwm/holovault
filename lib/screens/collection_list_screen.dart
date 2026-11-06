@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
 import 'package:drift/drift.dart' show Value;
@@ -7,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../collection_search.dart';
+import '../custom_field_file.dart';
 import '../database/database.dart';
 import '../import_schema.dart';
 import '../widgets/search_filter_bar.dart';
@@ -241,6 +243,69 @@ class CollectionListScreen extends StatelessWidget {
     );
   }
 
+  /// REQ-047 (ADR-23 Option 1): export the custom fields through the save dialog.
+  Future<void> _handleExportCustomFields(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final rows = await database.overrideRows();
+      final now = DateTime.now();
+      String two(int n) => n.toString().padLeft(2, '0');
+      final saved = await FilePicker.saveFile(
+        fileName:
+            'holovault-custom-fields-${now.year}-${two(now.month)}-${two(now.day)}.json',
+        bytes: Uint8List.fromList(utf8.encode(buildCustomFieldsFile(rows))),
+      );
+      if (saved == null) {
+        messenger.showSnackBar(const SnackBar(content: Text('Export cancelled')));
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Exported ${rows.length} custom field row(s)')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
+  /// REQ-047: validate the whole file, then one transaction; refusal writes nothing.
+  Future<void> _handleImportCustomFields(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      final path = picked?.files.single.path;
+      if (path == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Custom field import cancelled')),
+        );
+        return;
+      }
+      final parsed = parseCustomFieldsFile(
+        utf8.decode(await File(path).readAsBytes()),
+      );
+      if (parsed.rows == null) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Custom field import refused: ${parsed.refusal}'),
+          ),
+        );
+        return;
+      }
+      await database.importCustomFieldRows(parsed.rows!);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Imported ${parsed.rows!.length} custom field row(s)'),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Custom field import failed: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -251,6 +316,15 @@ class CollectionListScreen extends StatelessWidget {
             icon: const Icon(Icons.file_upload),
             tooltip: 'Import',
             onPressed: () => _handleImport(context),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (v) => v == 'export'
+                ? _handleExportCustomFields(context)
+                : _handleImportCustomFields(context),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'export', child: Text('Export custom fields')),
+              PopupMenuItem(value: 'import', child: Text('Import custom fields')),
+            ],
           ),
         ],
       ),
