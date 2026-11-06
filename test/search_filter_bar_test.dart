@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/database/database.dart';
+import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/widgets/search_filter_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -185,6 +188,94 @@ void main() {
     // Cancel only dismisses the confirm dialog -- the preset dropdown
     // menu is still open underneath it, so the preset is already visible.
     expect(find.text('Charizards'), findsWidgets);
+
+    await disposeAndFlush(tester);
+  });
+
+  // REQ-045 (v): a registry with one declared custom text field, `tag`.
+  final tagRegistry = <CustomColumn>[
+    CustomColumn('tag', CustomColumnType.text, (r) => r.tag, (t) => t.serialNo),
+  ];
+
+  Future<void> pumpTagged(WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchFilterBar(
+            prefsKeyPrefix: 'test',
+            items: items,
+            onFiltered: (_) {},
+            registry: tagRegistry,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  Map<String, String> clause(String field, String op, String value) =>
+      {'field': field, 'op': op, 'value': value};
+
+  testWidgets('REQ-045 (v): bad stored clauses and presets are skipped, the rest still load',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'test_clauses': jsonEncode([
+        clause('cf.gone', 'equal', 'a'), // removed custom field
+        clause('bogus', 'equal', 'b'), // unknown built-in name
+        clause('rarity', 'nope', 'c'), // unknown operator
+        clause('rarity', 'equal', 'Holo'),
+        clause('cf.tag', 'notEqual', 'x'),
+      ]),
+      'test_presets': jsonEncode([
+        {
+          'name': 'Bad',
+          'searchTerm': '',
+          'clauses': [clause('cf.gone', 'equal', 'a')],
+        },
+        {
+          'name': 'Good',
+          'searchTerm': 'zz',
+          'clauses': [clause('cf.tag', 'equal', 'x')],
+        },
+      ]),
+    });
+    await pumpTagged(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(InputChip), findsNWidgets(2));
+    expect(find.textContaining('Holo'), findsOneWidget);
+    expect(find.text('tag != x'), findsOneWidget);
+    expect(find.textContaining('gone'), findsNothing);
+
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('Good'), findsWidgets);
+    expect(find.text('Bad'), findsNothing);
+
+    await disposeAndFlush(tester);
+  });
+
+  testWidgets('REQ-045 (v): a preset holding a custom clause saves and reloads',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({
+      'test_clauses': jsonEncode([clause('cf.tag', 'equal', 'x')]),
+    });
+    await pumpTagged(tester);
+    expect(find.text('tag = x'), findsOneWidget);
+    await saveAs(tester, 'Mine');
+    await disposeAndFlush(tester);
+
+    // Fresh instance with no live clauses: only the saved preset can bring
+    // the custom clause back.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('test_clauses');
+    await pumpTagged(tester);
+    expect(find.byType(InputChip), findsNothing);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mine').last);
+    await tester.pumpAndSettle();
+    expect(find.text('tag = x'), findsOneWidget);
 
     await disposeAndFlush(tester);
   });

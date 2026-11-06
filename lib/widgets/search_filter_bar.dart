@@ -97,7 +97,8 @@ class SearchFilterBarState extends State<SearchFilterBar> {
     final rawClauses = prefs.getString(_clausesKey);
     if (rawClauses != null) {
       final decoded = jsonDecode(rawClauses) as List<dynamic>;
-      // REQ-043 (e): a skipped entry is dropped from storage on the next save.
+      // REQ-043 (e): a skipped clause is dropped from storage on the next
+      // clause save; a skipped preset on the next preset save or delete.
       _clauses.addAll(
         decoded
             .map((e) => SearchClause.tryFromJson(e as Map<String, dynamic>, widget.registry))

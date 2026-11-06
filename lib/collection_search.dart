@@ -60,14 +60,6 @@ enum SearchOperator {
   final String symbol;
 }
 
-/// Text fields only support equal/notEqual -- a `>`/`<` reading on a
-/// string field (per real column collation) is not something ADR-18
-/// exposes to the picker.
-List<SearchOperator> operatorsFor(SearchField field) =>
-    field.isText
-        ? const [SearchOperator.equal, SearchOperator.notEqual]
-        : SearchOperator.values;
-
 /// A clause targets a built-in [field] or, REQ-043 (e), a custom field by
 /// [customFieldId] (`cf.<name>`); exactly one is set.
 class SearchClause {
@@ -295,10 +287,7 @@ Future<List<MergedItem>> filterCollectionItems(
 /// ADR-18: real distinct values for a text field, scoped to [narrowed] --
 /// the items still matching every clause already added -- so the value
 /// picker never offers a choice that would already yield zero results.
-List<String> distinctValuesFor(SearchField field, List<MergedItem> narrowed) =>
-    distinctValuesForId(field.name, narrowed);
-
-/// As [distinctValuesFor] for a built-in or custom (`cf.<name>`) field id.
+/// Takes a built-in (`SearchField.name`) or custom (`cf.<name>`) field id.
 List<String> distinctValuesForId(
   String id,
   List<MergedItem> narrowed, [

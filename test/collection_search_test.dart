@@ -172,7 +172,7 @@ void main() {
     expect(result.map((i) => i.name), ['Pricey per unit']);
   });
 
-  test('REQ-030: distinctValuesFor returns sorted, deduplicated real values', () async {
+  test('REQ-030: distinctValuesForId returns sorted, deduplicated real values', () async {
     await db.upsertItem(
       CollectionItemsCompanion.insert(importedId: '1', name: 'A', rarity: const Value('Sealed')),
     );
@@ -184,7 +184,7 @@ void main() {
     );
     final items = await db.select(db.mergedItems).get();
 
-    expect(distinctValuesFor(SearchField.rarity, items), ['Holo', 'Sealed']);
+    expect(distinctValuesForId(SearchField.rarity.name, items), ['Holo', 'Sealed']);
   });
 
   group('REQ-041: return fields', () {
