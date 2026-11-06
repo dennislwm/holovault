@@ -104,14 +104,13 @@ class SearchClause {
 }
 
 /// REQ-043 (e): the Add clause picker's field ids: built-ins (rival rule
-/// applied) then declared custom ones. Bool (no clause behaviour specified)
-/// is not offered; date is, last among the types in declaration order.
+/// applied) then declared custom ones (REQ-046: every type, date last).
 List<String> pickerFieldIds(List<SearchClause> existing, [List<CustomColumn>? registry]) {
   final reg = registry ?? customColumns;
   return [
     for (final f in availableFields(existing)) f.name,
     for (final c in reg)
-      if (c.type != CustomColumnType.bool && c.type != CustomColumnType.date) customId(c.name),
+      if (c.type != CustomColumnType.date) customId(c.name),
     for (final c in reg)
       if (c.type == CustomColumnType.date) customId(c.name),
   ];
@@ -124,12 +123,13 @@ String pickerFieldLabel(String id, [List<CustomColumn>? registry]) {
 }
 
 /// Text handling (= and != only, dropdown value) for built-in text fields and
-/// custom text and choice fields.
+/// custom text and choice fields, and (REQ-046) custom bool fields, whose
+/// dropdown offers the fixed values true and false.
 bool fieldIsText(String id, [List<CustomColumn>? registry]) {
   final b = SearchField.values.asNameMap()[id];
   if (b != null) return b.isText;
   final t = customColumnFor(id, registry ?? customColumns)?.type;
-  return t == CustomColumnType.text || t == CustomColumnType.choice;
+  return t == CustomColumnType.text || t == CustomColumnType.choice || t == CustomColumnType.bool;
 }
 
 List<SearchOperator> operatorsForId(String id, [List<CustomColumn>? registry]) =>
@@ -196,6 +196,12 @@ String? _textValueById(MergedItem item, String id, List<CustomColumn> registry) 
 }
 
 bool _matchesClause(MergedItem item, SearchClause clause, DateTime now, List<CustomColumn> registry) {
+  if (customColumnFor(clause.fieldId, registry)?.type == CustomColumnType.bool) {
+    final v = customColumnFor(clause.fieldId, registry)!.value(item);
+    if (v is! bool || (clause.value != 'true' && clause.value != 'false')) return false;
+    final same = v == (clause.value == 'true');
+    return clause.op == SearchOperator.notEqual ? !same : same;
+  }
   if (fieldIsText(clause.fieldId, registry)) {
     final actual = _textValueById(item, clause.fieldId, registry);
     if (actual == null) return false;
@@ -294,6 +300,7 @@ List<String> distinctValuesForId(
   List<CustomColumn>? registry,
 ]) {
   final reg = registry ?? customColumns;
+  if (customColumnFor(id, reg)?.type == CustomColumnType.bool) return const ['true', 'false'];
   final values = <String>{};
   for (final item in narrowed) {
     final v = _textValueById(item, id, reg);

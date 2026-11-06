@@ -90,13 +90,14 @@ void main() {
     expect(loaded.clauses.length, 2);
   });
 
-  test('picker lists built-ins then custom fields then date fields, without bool', () {
+  test('picker lists built-ins then custom fields (bool included) then date fields', () {
     final ids = pickerFieldIds(const [], registry);
     expect(ids.take(SearchField.values.length), [for (final f in SearchField.values) f.name]);
     expect(
       ids.skip(SearchField.values.length),
-      ['cf.txt', 'cf.pick', 'cf.whole', 'cf.dec', 'cf.when'],
+      ['cf.txt', 'cf.pick', 'cf.whole', 'cf.dec', 'cf.flag', 'cf.when'],
     );
+    expect(pickerFieldLabel('cf.flag', registry), 'flag (bool)');
     expect(pickerFieldLabel('cf.when', registry), 'when (date)');
     expect(operatorsForId('cf.when', registry), SearchOperator.values);
     expect(pickerFieldLabel('cf.pick', registry), 'pick (choice)');
@@ -104,6 +105,88 @@ void main() {
     expect(operatorsForId('cf.pick', registry).length, 2);
     expect(operatorsForId('cf.dec', registry), SearchOperator.values);
     expect(distinctValuesForId('cf.pick', items, registry), ['LP', 'NM']);
+  });
+
+  group('bool fields (REQ-046)', () {
+    MergedItem w(String name, bool? v) =>
+        MergedItem(id: 1, importedId: name, name: name, groupWishlist: v);
+    final bools = [w('yes', true), w('no', false), w('none', null)];
+    Future<List<String>> hit(SearchOperator op, String v) => names(bools, cc('flag', op, v));
+
+    test('= and != compare the bool; null never matches, not even !=', () async {
+      expect(await hit(SearchOperator.equal, 'true'), ['yes']);
+      expect(await hit(SearchOperator.equal, 'false'), ['no']);
+      expect(await hit(SearchOperator.notEqual, 'true'), ['no']);
+      expect(await hit(SearchOperator.notEqual, 'false'), ['yes']);
+    });
+
+    test('a clause value other than true or false never matches or throws', () async {
+      for (final v in ['', 'TRUE', '1', 'yes', 'true ']) {
+        for (final op in SearchOperator.values) {
+          expect(await hit(op, v), isEmpty, reason: '$op "$v"');
+        }
+      }
+    });
+
+    test('operators are = and != only; values are fixed; JSON keeps the text', () {
+      expect(operatorsForId('cf.flag', registry), [SearchOperator.equal, SearchOperator.notEqual]);
+      expect(distinctValuesForId('cf.flag', [w('yes', true)], registry), ['true', 'false']);
+      final back = SearchClause.tryFromJson(
+        jsonDecode(jsonEncode(cc('flag', SearchOperator.equal, 'true').toJson()))
+            as Map<String, dynamic>,
+        registry,
+      )!;
+      expect(back.value, 'true');
+      expect(back.customFieldId, 'cf.flag');
+    });
+
+    testWidgets('the sheet offers true and false for held-only-true items and narrows',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final held = [w('a', true), w('b', null)];
+      var shown = held;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchFilterBar(
+              prefsKeyPrefix: 'b',
+              items: held,
+              registry: registry,
+              onFiltered: (f) => shown = f,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add clause'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Field').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('flag (bool)'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.text('flag (bool)').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Operator').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('=').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Value').last);
+      await tester.pumpAndSettle();
+      expect(find.text('false'), findsOneWidget);
+      await tester.tap(find.text('true').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add').last);
+      await tester.pumpAndSettle();
+
+      expect(shown.map((i) => i.name), ['a']);
+      expect(find.text('flag = true'), findsOneWidget);
+    });
   });
 
   group('date fields (f)', () {
