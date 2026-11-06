@@ -3,6 +3,8 @@
     { "name": "serialNo", "type": "text" },
     { "name": "preGrade", "type": "choice" },
     { "name": "addCost", "type": "real" },
-    { "name": "releasePrice", "type": "real" }
+    { "name": "releasePrice", "type": "real" },
+    { "name": "eventDate", "type": "date" },
+    { "name": "eventName", "type": "choice" }
   ]
 }

@@ -67,6 +67,10 @@ void main() {
       final rows = await overridesRows(db);
       expect(rows, hasLength(1));
       expect(rows.single.data['imported_id'], 'a1');
+      expect(customColumns.map((c) => c.name), [
+        'serialNo', 'preGrade', 'addCost', 'releasePrice',
+        'eventDate', 'eventName',
+      ]);
       for (final c in customColumns) {
         expect(rows.single.data.containsKey(
           c.column(db.collectionItemOverrides).$name), isTrue);
@@ -84,7 +88,7 @@ void main() {
       db = AppDatabase.withExecutor(NativeDatabase(dbFile));
       final rows = await overridesRows(db);
       expect(rows, hasLength(1));
-      expect(rows.single.data.length, customColumns.length + 1);
+      expect(rows.single.data.length, 7);
       await db.close();
     });
   });

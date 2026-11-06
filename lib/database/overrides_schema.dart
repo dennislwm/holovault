@@ -10,6 +10,8 @@ class CollectionItemOverrides extends Table {
   TextColumn get preGrade => text().nullable()();
   RealColumn get addCost => real().nullable()();
   RealColumn get releasePrice => real().nullable()();
+  DateTimeColumn get eventDate => dateTime().nullable()();
+  TextColumn get eventName => text().nullable()();
 }
 
 abstract class MergedItems extends View {
@@ -46,6 +48,8 @@ abstract class MergedItems extends View {
     collectionItemOverrides.preGrade,
     collectionItemOverrides.addCost,
     collectionItemOverrides.releasePrice,
+    collectionItemOverrides.eventDate,
+    collectionItemOverrides.eventName,
   ]).from(collectionItems).join([
     leftOuterJoin(
       collectionItemOverrides,
@@ -73,4 +77,6 @@ final customColumns = <CustomColumn>[
   CustomColumn('preGrade', CustomColumnType.choice, (r) => r.preGrade, (t) => t.preGrade),
   CustomColumn('addCost', CustomColumnType.real, (r) => r.addCost, (t) => t.addCost),
   CustomColumn('releasePrice', CustomColumnType.real, (r) => r.releasePrice, (t) => t.releasePrice),
+  CustomColumn('eventDate', CustomColumnType.date, (r) => r.eventDate, (t) => t.eventDate),
+  CustomColumn('eventName', CustomColumnType.choice, (r) => r.eventName, (t) => t.eventName),
 ];

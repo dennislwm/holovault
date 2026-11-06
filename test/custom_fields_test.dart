@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:drift/drift.dart' show DriftSqlType;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,6 +70,34 @@ void main() {
       final cleared = await db.mergedItemByImportedId('c1');
       expect(cleared!.serialNo, isNull);
       expect(cleared.addCost, 12.5);
+    });
+
+    test('REQ-044: date and choice fields round-trip through the merged view', () async {
+      final date = _col('eventDate');
+      expect(date.type, CustomColumnType.date);
+      expect(_col('eventName').type, CustomColumnType.choice);
+      expect(date.column(db.collectionItemOverrides).type, DriftSqlType.dateTime);
+
+      final before = await db.select(db.collectionItems).get();
+      final when = DateTime(2026, 11, 6, 13, 45, 30); // local, whole seconds
+      final vals = {'eventDate': when, 'eventName': 'Worlds'};
+      await db.saveCustomFields('c1', vals);
+      await db.saveCustomFields('c1', vals);
+
+      expect(await db.select(db.collectionItemOverrides).get(), hasLength(1));
+      final merged = (await db.mergedItemByImportedId('c1'))!;
+      final read = date.value(merged);
+      expect(read, isA<DateTime>());
+      expect(read, when);
+      expect((read as DateTime).isUtc, isFalse);
+      expect(merged.eventName, 'Worlds');
+      expect(await db.select(db.collectionItems).get(), before);
+
+      await db.saveCustomFields('c1', {'eventDate': null});
+      final cleared = (await db.mergedItemByImportedId('c1'))!;
+      expect(cleared.eventDate, isNull);
+      expect(cleared.eventName, 'Worlds');
+      expect(await db.select(db.collectionItems).get(), before);
     });
 
     test('REQ-043 c: merged stream carries custom values, null without overrides, omits hidden rows', () async {
