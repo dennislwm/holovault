@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../collection_search.dart';
 import '../database/database.dart';
+import '../database/overrides_schema.dart';
 import 'columns_dialog.dart';
 
 /// REQ-042 (b), ADR-22 Option 1: the controls strip shared by the three
@@ -26,7 +27,11 @@ class ItemListStrip extends StatefulWidget {
     this.columns,
     this.defaultColumns = const [],
     this.onColumnsChanged,
+    this.registry,
   });
+
+  /// REQ-043 (d): declared custom columns; null means the generated registry.
+  final List<CustomColumn>? registry;
 
   final String prefsKeyPrefix;
   final List<MergedItem> filtered;
@@ -63,10 +68,11 @@ class _ItemListStripState extends State<ItemListStrip> {
     if (!mounted) return;
     final cols = prefs.get(_colsPref);
     if (cols != null) {
-      widget.onColumnsChanged?.call(parseColumnIds(cols, widget.defaultColumns));
+      widget.onColumnsChanged?.call(parseColumnIds(cols, widget.defaultColumns, registry: widget.registry));
     }
-    // An unknown, missing or wrong-typed key keeps the host's initial value.
-    if (key is! String || !sortKeyIds.contains(key)) return;
+    // An unknown (or removed custom), missing or wrong-typed key keeps the
+    // host's initial value.
+    if (key is! String || !sortableIdsFor(widget.registry).contains(key)) return;
     widget.onChanged(key, asc is bool ? asc : true);
   }
 
@@ -78,7 +84,7 @@ class _ItemListStripState extends State<ItemListStrip> {
   }
 
   Future<void> _pickColumns() async {
-    final chosen = await showColumnsDialog(context, selected: widget.columns!);
+    final chosen = await showColumnsDialog(context, selected: widget.columns!, registry: widget.registry);
     if (chosen == null) return;
     final ids = chosen.isEmpty ? widget.defaultColumns : chosen;
     widget.onColumnsChanged?.call(ids);
@@ -116,8 +122,8 @@ class _ItemListStripState extends State<ItemListStrip> {
                 value: widget.sortKey,
                 isDense: true,
                 items: [
-                  for (final id in sortKeyIds)
-                    DropdownMenuItem(value: id, child: Text(sortKeyLabel(id))),
+                  for (final id in sortableIdsFor(widget.registry))
+                    DropdownMenuItem(value: id, child: Text(sortKeyLabel(id, widget.registry))),
                 ],
                 // A key change resets the direction to ascending.
                 onChanged: (id) => id == null ? null : _change(id, true),

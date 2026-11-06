@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../collection_search.dart';
+import '../database/overrides_schema.dart';
 
 /// REQ-042 (c), ADR-22: pick which fields a row shows and in what order.
 /// Returns the checked ids in chosen order, or null when cancelled. An empty
@@ -8,17 +9,19 @@ import '../collection_search.dart';
 Future<List<String>?> showColumnsDialog(
   BuildContext context, {
   required List<String> selected,
+  List<CustomColumn>? registry,
 }) {
   return showDialog<List<String>>(
     context: context,
-    builder: (_) => _ColumnsDialog(selected: selected),
+    builder: (_) => _ColumnsDialog(selected: selected, registry: registry),
   );
 }
 
 class _ColumnsDialog extends StatefulWidget {
-  const _ColumnsDialog({required this.selected});
+  const _ColumnsDialog({required this.selected, this.registry});
 
   final List<String> selected;
+  final List<CustomColumn>? registry;
 
   @override
   State<_ColumnsDialog> createState() => _ColumnsDialogState();
@@ -27,7 +30,7 @@ class _ColumnsDialog extends StatefulWidget {
 class _ColumnsDialogState extends State<_ColumnsDialog> {
   late final List<String> _order = [
     ...widget.selected,
-    for (final id in sortKeyIds)
+    for (final id in columnIdsFor(widget.registry))
       if (!widget.selected.contains(id)) id,
   ];
   late final Set<String> _checked = {...widget.selected};
@@ -49,7 +52,7 @@ class _ColumnsDialogState extends State<_ColumnsDialog> {
               CheckboxListTile(
                 key: ValueKey(id),
                 value: _checked.contains(id),
-                title: Text(sortKeyLabel(id)),
+                title: Text(sortKeyLabel(id, widget.registry)),
                 onChanged: (v) => setState(() {
                   v == true ? _checked.add(id) : _checked.remove(id);
                 }),

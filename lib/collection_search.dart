@@ -4,6 +4,7 @@ import 'package:local_query_filter/local_query_filter.dart';
 
 import 'annualized_return.dart';
 import 'database/database.dart';
+import 'database/overrides_schema.dart';
 
 /// ADR-18, Option 2: fields an ad hoc clause can target.
 enum SearchField {
@@ -220,11 +221,73 @@ final List<String> sortKeyIds = [
   for (final f in SearchField.values) f.name,
 ];
 
-String sortKeyLabel(String id) => switch (id) {
+/// REQ-043 (d): a custom field's list id is `cf.<name>`, so it cannot collide
+/// with a built-in id. Stored by string like the built-ins.
+const customIdPrefix = 'cf.';
+String customId(String name) => '$customIdPrefix$name';
+
+/// The declared custom column behind [id], or null (not a custom id, or no
+/// longer declared).
+CustomColumn? customColumnFor(String id, List<CustomColumn> registry) {
+  if (!id.startsWith(customIdPrefix)) return null;
+  final name = id.substring(customIdPrefix.length);
+  for (final c in registry) {
+    if (c.name == name) return c;
+  }
+  return null;
+}
+
+/// Every id a column can show: built-ins first, then declared custom ones.
+List<String> columnIdsFor([List<CustomColumn>? registry]) => [
+      ...sortKeyIds,
+      for (final c in registry ?? customColumns) customId(c.name),
+    ];
+
+/// Ids a list can sort by: as [columnIdsFor] minus date columns (slice (f)).
+List<String> sortableIdsFor([List<CustomColumn>? registry]) => [
+      ...sortKeyIds,
+      for (final c in registry ?? customColumns)
+        if (c.type != CustomColumnType.date) customId(c.name),
+    ];
+
+/// Label for [id]; an id that names nothing known returns itself, never throws.
+String sortKeyLabel(String id, [List<CustomColumn>? registry]) => switch (id) {
       nameSortKey => 'Name',
       extraSortKey => 'Extra',
-      _ => SearchField.values.byName(id).label,
+      _ => SearchField.values.asNameMap()[id]?.label ??
+          customColumnFor(id, registry ?? customColumns)?.name ??
+          id,
     };
+
+num? _customNum(Object? v) => switch (v) {
+      num n => n,
+      bool b => b ? 1 : 0,
+      _ => null,
+    };
+
+/// Sort value of a custom column: text and choice lowercase, int and real
+/// numeric, bool false before true. Null when unset.
+Comparable? customSortValue(CustomColumn c, MergedItem item) {
+  final v = c.value(item);
+  return switch (c.type) {
+    CustomColumnType.text || CustomColumnType.choice => v is String ? v.toLowerCase() : null,
+    CustomColumnType.int || CustomColumnType.real || CustomColumnType.bool => _customNum(v),
+    CustomColumnType.date => null,
+  } as Comparable?;
+}
+
+String _two(int n) => n.toString().padLeft(2, '0');
+
+/// Row cell text of a custom column; a date is the calendar date only.
+String? customCellText(CustomColumn c, MergedItem item) {
+  final v = c.value(item);
+  if (v == null) return null;
+  return switch (v) {
+    DateTime d => '${d.year.toString().padLeft(4, '0')}-${_two(d.month)}-${_two(d.day)}',
+    bool b => b ? 'Yes' : 'No',
+    _ => '$v',
+  };
+}
 
 /// REQ-042 (b): [items] ordered by [key], an item with no value for it
 /// always last (ascending or descending). Unknown [key] returns the list
@@ -234,10 +297,14 @@ List<MergedItem> sortItems(
   String key,
   bool ascending, {
   DateTime? now,
+  List<CustomColumn>? registry,
 }) {
-  if (!sortKeyIds.contains(key)) return items;
+  final reg = registry ?? customColumns;
+  if (!sortableIdsFor(reg).contains(key)) return items;
   final today = now ?? DateTime.now();
+  final custom = customColumnFor(key, reg);
   Comparable? valueOf(MergedItem i) {
+    if (custom != null) return customSortValue(custom, i);
     if (key == nameSortKey) return i.name.toLowerCase();
     if (key == extraSortKey) return i.extra?.toLowerCase();
     final field = SearchField.values.byName(key);
@@ -282,10 +349,14 @@ Map<String, double> collectionDistribution(List<MergedItem> items) {
 /// REQ-042 (c), ADR-22: the text a row cell shows for column [id], or null
 /// when the item has no value for it. Money to two decimals, percent to one,
 /// quantity as `×N`, text fields verbatim.
-String? cellText(MergedItem item, String id, {DateTime? now}) {
+String? cellText(MergedItem item, String id, {DateTime? now, List<CustomColumn>? registry}) {
   if (id == nameSortKey) return item.name;
   if (id == extraSortKey) return item.extra;
-  final field = SearchField.values.byName(id);
+  final field = SearchField.values.asNameMap()[id];
+  if (field == null) {
+    final c = customColumnFor(id, registry ?? customColumns);
+    return c == null ? null : customCellText(c, item);
+  }
   if (field.isText) return textFieldValue(item, field);
   final v = _numericFieldValue(item, field, now ?? DateTime.now());
   if (v == null) return null;
@@ -312,7 +383,12 @@ double maxAbsReturnAnnual(List<MergedItem> items, {DateTime? now}) {
 /// REQ-042 (c): column ids from a stored JSON list. Unknown ids, duplicates
 /// and wrong-typed entries are skipped; a missing, malformed or empty result
 /// falls back to [fallback].
-List<String> parseColumnIds(Object? stored, List<String> fallback) {
+List<String> parseColumnIds(
+  Object? stored,
+  List<String> fallback, {
+  List<CustomColumn>? registry,
+}) {
+  final known = columnIdsFor(registry);
   if (stored is! String) return fallback;
   final Object? decoded;
   try {
@@ -324,7 +400,7 @@ List<String> parseColumnIds(Object? stored, List<String> fallback) {
   final ids = [
     ...{
     for (final e in decoded)
-      if (e is String && sortKeyIds.contains(e)) e,
+      if (e is String && known.contains(e)) e,
     },
   ];
   return ids.isEmpty ? fallback : ids;

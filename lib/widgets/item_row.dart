@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../annualized_return.dart';
 import '../collection_search.dart';
 import '../database/database.dart';
+import '../database/overrides_schema.dart';
 
 /// REQ-042 (f): shown by every item list when its filter leaves no rows.
 const noMatchingItemsMessage = 'No items match the current filter';
@@ -19,7 +20,11 @@ class ItemRow extends StatelessWidget {
     required this.item,
     required this.columns,
     this.returnBarMax = 0,
+    this.registry,
   });
+
+  /// REQ-043 (d): declared custom columns; null means the generated registry.
+  final List<CustomColumn>? registry;
 
   final MergedItem item;
   final List<String> columns;
@@ -28,9 +33,9 @@ class ItemRow extends StatelessWidget {
   // Value and quantity read on their own; every other trailing cell carries
   // its label so two numbers are never ambiguous.
   Widget _cell(BuildContext context, String id, {required bool trailing, TextStyle? style}) {
-    final text = cellText(item, id) ?? '--';
+    final text = cellText(item, id, registry: registry) ?? '--';
     final bare = !trailing || id == SearchField.value.name || id == SearchField.quantity.name;
-    final label = Text(bare ? text : '${sortKeyLabel(id)}: $text', style: style);
+    final label = Text(bare ? text : '${sortKeyLabel(id, registry)}: $text', style: style);
     if (id != SearchField.returnAnnual.name) return label;
     final pct = annualizedReturnPercent(item, DateTime.now());
     final factor = pct == null || returnBarMax == 0
@@ -64,7 +69,7 @@ class ItemRow extends StatelessWidget {
                 _cell(context, columns.first, trailing: false),
                 if (columns.length > 1 &&
                     (columns[1] == SearchField.returnAnnual.name ||
-                        cellText(item, columns[1]) != null))
+                        cellText(item, columns[1], registry: registry) != null))
                   _cell(context, columns[1], trailing: false, style: small),
               ],
             ),
