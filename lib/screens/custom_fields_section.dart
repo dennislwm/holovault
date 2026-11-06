@@ -8,13 +8,16 @@ import '../database/overrides_schema.dart';
 String _fieldName(CustomColumn c) => 'cf.${c.name}';
 
 /// REQ-043 (b): maps the form's raw values to a name-to-value map for
-/// [AppDatabase.saveCustomFields]. Empty text and choice become null.
+/// [AppDatabase.saveCustomFields]. Empty text and choice become null. A column
+/// whose form key is absent (section not yet loaded) is skipped, so its stored
+/// value is left alone.
 Map<String, Object?> collectCustomValues(
   List<CustomColumn> registry,
   Map<String, dynamic> form,
 ) {
   final out = <String, Object?>{};
   for (final c in registry) {
+    if (!form.containsKey(_fieldName(c))) continue;
     final v = form[_fieldName(c)];
     out[c.name] = switch (c.type) {
       CustomColumnType.text ||

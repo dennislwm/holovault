@@ -7,12 +7,64 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/custom_field_logic.dart';
 import 'package:holovault/database/database.dart';
 import 'package:holovault/database/overrides_schema.dart';
+import 'package:holovault/screens/custom_fields_section.dart';
 import 'package:holovault/screens/item_detail_screen.dart';
 
 CustomColumn _col(String name) =>
     customColumns.firstWhere((c) => c.name == name);
 
+// REQ-045: a registry holding all six types (the real one has no int or bool).
+// The value/column callbacks are never called by collectCustomValues.
+final _allTypes = <CustomColumn>[
+  for (final t in CustomColumnType.values)
+    CustomColumn(t.name, t, (r) => null, (tbl) => tbl.serialNo),
+];
+
 void main() {
+  group('REQ-045: collectCustomValues', () {
+    test('a column whose form key is absent is left out of the save map', () {
+      final out = collectCustomValues(_allTypes, {'cf.text': 'x'});
+      expect(out, {'text': 'x'});
+      expect(collectCustomValues(_allTypes, {}), isEmpty);
+    });
+
+    test('every type: empties null, int parsed, bool and date pass through', () {
+      final when = DateTime(2026, 11, 6);
+      final out = collectCustomValues(_allTypes, {
+        'cf.text': '',
+        'cf.choice': '',
+        'cf.real': '1.5',
+        'cf.int': '7',
+        'cf.bool': false,
+        'cf.date': when,
+      });
+      expect(out, {
+        'text': null,
+        'choice': null,
+        'real': 1.5,
+        'int': 7,
+        'bool': false,
+        'date': when,
+      });
+      final kept = collectCustomValues(_allTypes, {
+        'cf.text': 'a',
+        'cf.choice': 'b',
+        'cf.real': '',
+        'cf.int': '',
+        'cf.bool': null,
+        'cf.date': null,
+      });
+      expect(kept, {
+        'text': 'a',
+        'choice': 'b',
+        'real': null,
+        'int': null,
+        'bool': null,
+        'date': null,
+      });
+    });
+  });
+
   group('REQ-043 b: pure logic', () {
     test('validateNumber: dot-decimal or whole only, empty ok', () {
       expect(validateNumber('', whole: false), isNull);
@@ -72,6 +124,19 @@ void main() {
       expect(cleared.addCost, 12.5);
     });
 
+    test('REQ-045: a column absent from the save map keeps its stored value', () async {
+      await db.saveCustomFields('c1', {
+        'preGrade': 'Near Mint',
+        'serialNo': 'X1',
+        'eventName': 'Worlds',
+      });
+      await db.saveCustomFields('c1', {'serialNo': 'X2'});
+      final m = (await db.mergedItemByImportedId('c1'))!;
+      expect(m.serialNo, 'X2');
+      expect(m.preGrade, 'Near Mint');
+      expect(m.eventName, 'Worlds');
+    });
+
     test('REQ-044: date and choice fields round-trip through the merged view', () async {
       final date = _col('eventDate');
       expect(date.type, CustomColumnType.date);
@@ -120,6 +185,41 @@ void main() {
       await db.saveCustomFields('gone', {'preGrade': 'Played'});
       final s = suggestionList(await db.storedValues(_col('preGrade')));
       expect(s, ['Near Mint', 'Played']);
+    });
+
+    testWidgets('REQ-045: the date clear control empties the field and saves null', (
+      tester,
+    ) async {
+      await tester.runAsync(
+        () => db.saveCustomFields('c1', {
+          'eventDate': DateTime(2026, 11, 6),
+          'eventName': 'Worlds',
+        }),
+      );
+      final item = (await tester.runAsync(() => db.select(db.mergedItems).get()))!
+          .single;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ItemDetailScreen(
+            database: db,
+            items: [item],
+            initialIndex: 0,
+            registry: [_col('eventDate')],
+          ),
+        ),
+      );
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pump();
+
+      await tester.ensureVisible(find.byIcon(Icons.clear));
+      await tester.tap(find.byIcon(Icons.clear));
+      await tester.pump();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      final row = await tester.runAsync(() => db.mergedItemByImportedId('c1'));
+      expect(row!.eventDate, isNull);
+      expect(row.eventName, 'Worlds');
     });
 
     testWidgets('invalid input saves nothing; valid input saves the override', (
