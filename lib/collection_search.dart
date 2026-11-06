@@ -41,7 +41,7 @@ enum SearchField {
 /// already added -- every field except one whose [SearchField.rival] is in
 /// use. Removing the clause brings the rival back (derived, not stored).
 List<SearchField> availableFields(List<SearchClause> clauses) {
-  final used = {for (final c in clauses) c.field};
+  final used = {for (final c in clauses) if (c.field != null) c.field};
   return [
     for (final f in SearchField.values)
       if (!used.contains(f.rival)) f,
@@ -68,27 +68,77 @@ List<SearchOperator> operatorsFor(SearchField field) =>
         ? const [SearchOperator.equal, SearchOperator.notEqual]
         : SearchOperator.values;
 
+/// A clause targets a built-in [field] or, REQ-043 (e), a custom field by
+/// [customFieldId] (`cf.<name>`); exactly one is set.
 class SearchClause {
-  const SearchClause({required this.field, required this.op, required this.value});
-  final SearchField field;
+  const SearchClause({required SearchField this.field, required this.op, required this.value})
+      : customFieldId = null;
+  const SearchClause.custom({required String this.customFieldId, required this.op, required this.value})
+      : field = null;
+  final SearchField? field;
+  final String? customFieldId;
   final SearchOperator op;
   final String value;
+
+  /// Persisted id: the built-in `SearchField.name` (unchanged) or `cf.<name>`.
+  String get fieldId => field?.name ?? customFieldId!;
+
+  /// Chip label: the built-in label or the custom field's name, no type suffix.
+  String get fieldLabel =>
+      field?.label ?? customFieldId!.substring(customIdPrefix.length);
 
   /// REQ-034 (ADR-19): `jsonEncode` can't serialize enum fields directly --
   /// this explicit map conversion is the required step, per ADR-19's own
   /// Decision Drivers.
   Map<String, String> toJson() => {
-    'field': field.name,
+    'field': fieldId,
     'op': op.name,
     'value': value,
   };
 
-  factory SearchClause.fromJson(Map<String, dynamic> json) => SearchClause(
-    field: SearchField.values.byName(json['field'] as String),
-    op: SearchOperator.values.byName(json['op'] as String),
-    value: json['value'] as String,
-  );
+  /// REQ-043 (e): null (skip) when the field id names no built-in field and no
+  /// declared custom field, or the operator is unknown. Never throws on a
+  /// well-formed map.
+  static SearchClause? tryFromJson(Map<String, dynamic> json, [List<CustomColumn>? registry]) {
+    final id = json['field'] as String;
+    final op = SearchOperator.values.asNameMap()[json['op'] as String];
+    final value = json['value'] as String;
+    if (op == null) return null;
+    final builtIn = SearchField.values.asNameMap()[id];
+    if (builtIn != null) return SearchClause(field: builtIn, op: op, value: value);
+    if (customColumnFor(id, registry ?? customColumns) == null) return null;
+    return SearchClause.custom(customFieldId: id, op: op, value: value);
+  }
 }
+
+/// REQ-043 (e): the Add clause picker's field ids: built-ins (rival rule
+/// applied) then declared custom ones. Bool (no clause behaviour specified)
+/// and date (slice (f)) are not offered.
+List<String> pickerFieldIds(List<SearchClause> existing, [List<CustomColumn>? registry]) => [
+      for (final f in availableFields(existing)) f.name,
+      for (final c in registry ?? customColumns)
+        if (c.type != CustomColumnType.bool && c.type != CustomColumnType.date) customId(c.name),
+    ];
+
+/// Picker label: built-in label, or `name (type)` for a custom field.
+String pickerFieldLabel(String id, [List<CustomColumn>? registry]) {
+  final c = customColumnFor(id, registry ?? customColumns);
+  return c == null ? sortKeyLabel(id, registry) : '${c.name} (${c.type.name})';
+}
+
+/// Text handling (= and != only, dropdown value) for built-in text fields and
+/// custom text and choice fields.
+bool fieldIsText(String id, [List<CustomColumn>? registry]) {
+  final b = SearchField.values.asNameMap()[id];
+  if (b != null) return b.isText;
+  final t = customColumnFor(id, registry ?? customColumns)?.type;
+  return t == CustomColumnType.text || t == CustomColumnType.choice;
+}
+
+List<SearchOperator> operatorsForId(String id, [List<CustomColumn>? registry]) =>
+    fieldIsText(id, registry)
+        ? const [SearchOperator.equal, SearchOperator.notEqual]
+        : SearchOperator.values;
 
 int? _daysHeld(MergedItem item, DateTime now) {
   final added = item.dateAdded;
@@ -140,15 +190,30 @@ String? textFieldValue(MergedItem item, SearchField field) {
   }
 }
 
-bool _matchesClause(MergedItem item, SearchClause clause, DateTime now) {
-  if (clause.field.isText) {
-    final actual = textFieldValue(item, clause.field);
+/// Text value of built-in or custom field [id]; null when unset or not text.
+String? _textValueById(MergedItem item, String id, List<CustomColumn> registry) {
+  final f = SearchField.values.asNameMap()[id];
+  if (f != null) return textFieldValue(item, f);
+  final v = customColumnFor(id, registry)?.value(item);
+  return v is String ? v : null;
+}
+
+bool _matchesClause(MergedItem item, SearchClause clause, DateTime now, List<CustomColumn> registry) {
+  if (fieldIsText(clause.fieldId, registry)) {
+    final actual = _textValueById(item, clause.fieldId, registry);
     if (actual == null) return false;
     return clause.op == SearchOperator.notEqual
         ? actual != clause.value
         : actual == clause.value;
   }
-  final actual = _numericFieldValue(item, clause.field, now);
+  final builtIn = clause.field;
+  final num? actual;
+  if (builtIn != null) {
+    actual = _numericFieldValue(item, builtIn, now);
+  } else {
+    final v = customColumnFor(clause.fieldId, registry)?.value(item);
+    actual = v is num ? v : null;
+  }
   final target = num.tryParse(clause.value);
   if (actual == null || target == null) return false;
   switch (clause.op) {
@@ -176,15 +241,17 @@ Future<List<MergedItem>> filterCollectionItems(
   required String searchTerm,
   required List<SearchClause> clauses,
   DateTime? now,
+  List<CustomColumn>? registry,
 }) {
   final today = now ?? DateTime.now();
+  final reg = registry ?? customColumns;
   final filter = QueryFilter<MergedItem>(
     ascending: true,
     searchTerm: searchTerm,
     constraints: [
       for (final clause in clauses)
         CustomConstraint<MergedItem>(
-          customComparator: (item) => _matchesClause(item, clause, today),
+          customComparator: (item) => _matchesClause(item, clause, today, reg),
         ),
     ],
     searchFieldsExtractor: (item) => [
@@ -198,10 +265,19 @@ Future<List<MergedItem>> filterCollectionItems(
 /// ADR-18: real distinct values for a text field, scoped to [narrowed] --
 /// the items still matching every clause already added -- so the value
 /// picker never offers a choice that would already yield zero results.
-List<String> distinctValuesFor(SearchField field, List<MergedItem> narrowed) {
+List<String> distinctValuesFor(SearchField field, List<MergedItem> narrowed) =>
+    distinctValuesForId(field.name, narrowed);
+
+/// As [distinctValuesFor] for a built-in or custom (`cf.<name>`) field id.
+List<String> distinctValuesForId(
+  String id,
+  List<MergedItem> narrowed, [
+  List<CustomColumn>? registry,
+]) {
+  final reg = registry ?? customColumns;
   final values = <String>{};
   for (final item in narrowed) {
-    final v = textFieldValue(item, field);
+    final v = _textValueById(item, id, reg);
     if (v != null && v.isNotEmpty) values.add(v);
   }
   return values.toList()..sort();

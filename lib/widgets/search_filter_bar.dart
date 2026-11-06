@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../collection_search.dart';
 import '../database/database.dart';
+import '../database/overrides_schema.dart';
 
 /// ADR-19, Option 1: the search bar + clause-builder mechanism
 /// [CollectionListScreen] (ADR-18) originated, promoted to a shared widget
@@ -22,8 +23,11 @@ class SearchFilterBar extends StatefulWidget {
     required this.prefsKeyPrefix,
     required this.items,
     required this.onFiltered,
+    this.registry,
   });
 
+  /// REQ-043 (e): declared custom columns; null means [customColumns].
+  final List<CustomColumn>? registry;
   final String prefsKeyPrefix;
   final List<MergedItem> items;
   final void Function(List<MergedItem> filtered) onFiltered;
@@ -48,13 +52,20 @@ class FilterPreset {
     'clauses': clauses.map((c) => c.toJson()).toList(),
   };
 
-  factory FilterPreset.fromJson(Map<String, dynamic> json) => FilterPreset(
-    name: json['name'] as String,
-    searchTerm: json['searchTerm'] as String,
-    clauses: (json['clauses'] as List<dynamic>)
-        .map((e) => SearchClause.fromJson(e as Map<String, dynamic>))
-        .toList(),
-  );
+  /// REQ-043 (e): null (the whole preset is skipped) when any clause names a
+  /// field that is no longer declared.
+  static FilterPreset? tryFromJson(Map<String, dynamic> json, [List<CustomColumn>? registry]) {
+    final clauses = [
+      for (final e in json['clauses'] as List<dynamic>)
+        SearchClause.tryFromJson(e as Map<String, dynamic>, registry),
+    ];
+    if (clauses.contains(null)) return null;
+    return FilterPreset(
+      name: json['name'] as String,
+      searchTerm: json['searchTerm'] as String,
+      clauses: clauses.cast<SearchClause>(),
+    );
+  }
 }
 
 class SearchFilterBarState extends State<SearchFilterBar> {
@@ -86,15 +97,20 @@ class SearchFilterBarState extends State<SearchFilterBar> {
     final rawClauses = prefs.getString(_clausesKey);
     if (rawClauses != null) {
       final decoded = jsonDecode(rawClauses) as List<dynamic>;
+      // REQ-043 (e): a skipped entry is dropped from storage on the next save.
       _clauses.addAll(
-        decoded.map((e) => SearchClause.fromJson(e as Map<String, dynamic>)),
+        decoded
+            .map((e) => SearchClause.tryFromJson(e as Map<String, dynamic>, widget.registry))
+            .whereType<SearchClause>(),
       );
     }
     final rawPresets = prefs.getString(_presetsKey);
     if (rawPresets != null) {
       final decoded = jsonDecode(rawPresets) as List<dynamic>;
       _presets.addAll(
-        decoded.map((e) => FilterPreset.fromJson(e as Map<String, dynamic>)),
+        decoded
+            .map((e) => FilterPreset.tryFromJson(e as Map<String, dynamic>, widget.registry))
+            .whereType<FilterPreset>(),
       );
     }
     await _recompute();
@@ -184,6 +200,7 @@ class SearchFilterBarState extends State<SearchFilterBar> {
       widget.items,
       searchTerm: _searchTerm,
       clauses: _clauses,
+      registry: widget.registry,
     );
     if (!mounted) return;
     setState(() => _filtered = result);
@@ -278,7 +295,7 @@ class SearchFilterBarState extends State<SearchFilterBar> {
                   label: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 200),
                     child: Text(
-                      '${_clauses[i].field.label} ${_clauses[i].op.symbol} ${_clauses[i].value}',
+                      '${_clauses[i].fieldLabel} ${_clauses[i].op.symbol} ${_clauses[i].value}',
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -292,6 +309,7 @@ class SearchFilterBarState extends State<SearchFilterBar> {
                   _filtered,
                   _addClause,
                   existing: _clauses,
+                  registry: widget.registry,
                 ),
               ),
             ],
@@ -347,12 +365,17 @@ void showAddClauseSheet(
   List<MergedItem> narrowed,
   void Function(SearchClause) onAdd, {
   List<SearchClause> existing = const [],
+  List<CustomColumn>? registry,
 }) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) =>
-        _AddClauseSheet(narrowed: narrowed, onAdd: onAdd, existing: existing),
+    builder: (context) => _AddClauseSheet(
+      narrowed: narrowed,
+      onAdd: onAdd,
+      existing: existing,
+      registry: registry ?? customColumns,
+    ),
   );
 }
 
@@ -367,8 +390,10 @@ class _AddClauseSheet extends StatefulWidget {
     required this.narrowed,
     required this.onAdd,
     required this.existing,
+    required this.registry,
   });
 
+  final List<CustomColumn> registry;
   final List<MergedItem> narrowed;
   final void Function(SearchClause) onAdd;
   final List<SearchClause> existing;
@@ -378,7 +403,7 @@ class _AddClauseSheet extends StatefulWidget {
 }
 
 class _AddClauseSheetState extends State<_AddClauseSheet> {
-  SearchField? _field;
+  String? _field; // field id: SearchField.name or cf.<name>
   SearchOperator? _op;
   String? _textValue;
   final _valueController = TextEditingController();
@@ -388,6 +413,8 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
     _valueController.dispose();
     super.dispose();
   }
+
+  bool get isText => _field != null && fieldIsText(_field!, widget.registry);
 
   @override
   Widget build(BuildContext context) {
@@ -404,12 +431,12 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
         children: [
           Text('Add clause', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
-          DropdownButtonFormField<SearchField>(
+          DropdownButtonFormField<String>(
             initialValue: _field,
             decoration: const InputDecoration(labelText: 'Field'),
             items: [
-              for (final f in availableFields(widget.existing))
-                DropdownMenuItem(value: f, child: Text(f.label)),
+              for (final id in pickerFieldIds(widget.existing, widget.registry))
+                DropdownMenuItem(value: id, child: Text(pickerFieldLabel(id, widget.registry))),
             ],
             onChanged: (value) => setState(() {
               _field = value;
@@ -424,7 +451,7 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
               initialValue: _op,
               decoration: const InputDecoration(labelText: 'Operator'),
               items: [
-                for (final o in operatorsFor(_field!))
+                for (final o in operatorsForId(_field!, widget.registry))
                   DropdownMenuItem(value: o, child: Text(o.symbol)),
               ],
               onChanged: (value) => setState(() => _op = value),
@@ -432,13 +459,13 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
           ],
           if (_field != null && _op != null) ...[
             const SizedBox(height: 12),
-            if (_field!.isText)
+            if (isText)
               DropdownButtonFormField<String>(
                 initialValue: _textValue,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Value'),
                 items: [
-                  for (final v in distinctValuesFor(_field!, widget.narrowed))
+                  for (final v in distinctValuesForId(_field!, widget.narrowed, widget.registry))
                     DropdownMenuItem(
                       value: v,
                       child: Text(v, overflow: TextOverflow.ellipsis),
@@ -457,15 +484,15 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _field == null || _op == null
-                || (_field!.isText ? _textValue == null : _valueController.text.isEmpty)
+                || (isText ? _textValue == null : _valueController.text.isEmpty)
                 ? null
                 : () {
+                    final value = isText ? _textValue! : _valueController.text;
+                    final builtIn = SearchField.values.asNameMap()[_field!];
                     widget.onAdd(
-                      SearchClause(
-                        field: _field!,
-                        op: _op!,
-                        value: _field!.isText ? _textValue! : _valueController.text,
-                      ),
+                      builtIn != null
+                          ? SearchClause(field: builtIn, op: _op!, value: value)
+                          : SearchClause.custom(customFieldId: _field!, op: _op!, value: value),
                     );
                     Navigator.of(context).pop();
                   },
