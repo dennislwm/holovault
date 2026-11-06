@@ -105,6 +105,58 @@ void main() {
     expect(parseColumnIds('["cf.qty"]', ['value'], registry: const []), ['value']);
   });
 
+  // REQ-045 (iv): mounts a strip over stored prefs; returns what it reported.
+  Future<({List<(String, bool)> sorts, List<List<String>> cols})> mountStrip(
+    WidgetTester tester,
+    Map<String, Object> stored,
+  ) async {
+    SharedPreferences.setMockInitialValues(stored);
+    final sorts = <(String, bool)>[];
+    final cols = <List<String>>[];
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ItemListStrip(
+          prefsKeyPrefix: 't',
+          filtered: const [],
+          whole: const [],
+          sortKey: 'name',
+          ascending: true,
+          onChanged: (k, a) => sorts.add((k, a)),
+          columns: const ['value'],
+          defaultColumns: const ['value'],
+          onColumnsChanged: cols.add,
+          registry: _registry,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    return (sorts: sorts, cols: cols);
+  }
+
+  testWidgets('REQ-045 (iv): a stored custom column and sort key are restored on mount', (
+    tester,
+  ) async {
+    final r = await mountStrip(tester, {
+      't_sort_key': 'cf.qty',
+      't_sort_asc': false,
+      't_columns': '["name","cf.qty"]',
+    });
+    expect(r.sorts, [('cf.qty', false)]);
+    expect(r.cols, [
+      ['name', 'cf.qty'],
+    ]);
+  });
+
+  testWidgets('REQ-045 (iv): a stored removed custom sort id keeps the host initial value', (
+    tester,
+  ) async {
+    final r = await mountStrip(tester, {
+      't_sort_key': 'cf.gone',
+      't_sort_asc': false,
+    });
+    expect(r.sorts, isEmpty);
+  });
+
   testWidgets('choosing a custom column shows its label: value cell', (tester) async {
     SharedPreferences.setMockInitialValues({});
     // Tall surface so every dialog row, custom ones last, is on screen.
