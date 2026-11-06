@@ -165,6 +165,18 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// REQ-045 (iii): the item row and its custom fields in one transaction, so
+  /// a failure in either leaves both as they were.
+  Future<void> saveItemAndCustomFields(
+    CollectionItemsCompanion item,
+    String importedId,
+    Map<String, Object?> values, {
+    List<CustomColumn>? registry,
+  }) => transaction(() async {
+    await upsertItem(item);
+    await saveCustomFields(importedId, values, registry: registry);
+  });
+
   /// REQ-043 (b): raw stored values of one overrides column, over live and
   /// hidden (no longer imported) rows alike; feed to `suggestionList`.
   Future<List<String?>> storedValues(CustomColumn c) async {

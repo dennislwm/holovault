@@ -115,16 +115,21 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   Future<void> _save(MergedItem item, Map<String, dynamic> values) {
     // Only name/extra are set here -- every other column stays absent, so
     // drift's DoUpdate leaves the item's imported typed fields untouched.
-    return widget.database.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: item.importedId,
-        name: values['name'] as String,
-        extra: Value(
-          (values['extra'] as String?)?.isEmpty ?? true
-              ? null
-              : values['extra'] as String,
-        ),
+    final entry = CollectionItemsCompanion.insert(
+      importedId: item.importedId,
+      name: values['name'] as String,
+      extra: Value(
+        (values['extra'] as String?)?.isEmpty ?? true
+            ? null
+            : values['extra'] as String,
       ),
+    );
+    if (widget.registry.isEmpty) return widget.database.upsertItem(entry);
+    return widget.database.saveItemAndCustomFields(
+      entry,
+      item.importedId,
+      collectCustomValues(widget.registry, values),
+      registry: widget.registry,
     );
   }
 
@@ -257,16 +262,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                           final state = formKey.currentState;
                           if (state != null && state.saveAndValidate()) {
                             await _save(item, state.value);
-                            if (widget.registry.isNotEmpty) {
-                              await widget.database.saveCustomFields(
-                                item.importedId,
-                                collectCustomValues(
-                                  widget.registry,
-                                  state.value,
-                                ),
-                                registry: widget.registry,
-                              );
-                            }
                           }
                         },
                         child: const Text('Save'),

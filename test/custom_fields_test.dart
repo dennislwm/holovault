@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:drift/drift.dart' show DriftSqlType;
+import 'package:drift/drift.dart' show DriftSqlType, GeneratedColumn, Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -135,6 +135,46 @@ void main() {
       expect(m.serialNo, 'X2');
       expect(m.preGrade, 'Near Mint');
       expect(m.eventName, 'Worlds');
+    });
+
+    test('REQ-045 (iii): one transaction; a failing custom write rolls the item back', () async {
+      final ok = {'serialNo': 'X1'};
+      final item = CollectionItemsCompanion.insert(
+        importedId: 'c1',
+        name: 'Renamed',
+        extra: const Value('e1'),
+      );
+      await db.saveItemAndCustomFields(item, 'c1', ok);
+      var row = (await db.mergedItemByImportedId('c1'))!;
+      expect([row.name, row.extra, row.serialNo], ['Renamed', 'e1', 'X1']);
+
+      // A column that does not exist in the overrides table: a real SQL error.
+      final bad = CustomColumn(
+        'nope',
+        CustomColumnType.text,
+        (r) => null,
+        (t) => GeneratedColumn<String>(
+          'no_such_col',
+          't',
+          true,
+          type: DriftSqlType.string,
+        ),
+      );
+      await expectLater(
+        db.saveItemAndCustomFields(
+          CollectionItemsCompanion.insert(
+            importedId: 'c1',
+            name: 'Lost',
+            extra: const Value('e2'),
+          ),
+          'c1',
+          {'serialNo': 'X2', 'nope': 'v'},
+          registry: [_col('serialNo'), bad],
+        ),
+        throwsA(anything),
+      );
+      row = (await db.mergedItemByImportedId('c1'))!;
+      expect([row.name, row.extra, row.serialNo], ['Renamed', 'e1', 'X1']);
     });
 
     test('REQ-044: date and choice fields round-trip through the merged view', () async {
