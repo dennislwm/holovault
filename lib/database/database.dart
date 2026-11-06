@@ -136,6 +136,44 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// REQ-043 (b): the item's merged row (imported + overrides), or null.
+  Future<MergedItem?> mergedItemByImportedId(String importedId) =>
+      (select(mergedItems)..where((m) => m.importedId.equals(importedId)))
+          .getSingleOrNull();
+
+  /// REQ-043 (b): upserts the overrides row for [importedId] from a
+  /// name-to-value map (null clears). Writes only the overrides table.
+  Future<void> saveCustomFields(
+    String importedId,
+    Map<String, Object?> values, {
+    List<CustomColumn>? registry,
+  }) {
+    final row = <String, Expression>{'imported_id': Variable<String>(importedId)};
+    for (final c in registry ?? customColumns) {
+      if (!values.containsKey(c.name)) continue;
+      final v = values[c.name];
+      row[c.column(collectionItemOverrides).name] =
+          v == null ? const Constant<Object>(null) : Variable<Object>(v);
+    }
+    final entry = RawValuesInsertable<CollectionItemOverride>(row);
+    return into(collectionItemOverrides).insert(
+      entry,
+      onConflict: DoUpdate(
+        (old) => entry,
+        target: [collectionItemOverrides.importedId],
+      ),
+    );
+  }
+
+  /// REQ-043 (b): raw stored values of one overrides column, over live and
+  /// hidden (no longer imported) rows alike; feed to `suggestionList`.
+  Future<List<String?>> storedValues(CustomColumn c) async {
+    final col = c.column(collectionItemOverrides);
+    final q = selectOnly(collectionItemOverrides, distinct: true)
+      ..addColumns([col]);
+    return (await q.get()).map((r) => r.read(col) as String?).toList();
+  }
+
   /// Reactive query for ADR-04's list screen -- emits a new list whenever
   /// the underlying table changes, so the UI stays live during import/edit.
   Stream<List<CollectionItem>> watchAllItems() =>

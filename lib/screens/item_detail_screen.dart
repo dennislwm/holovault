@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 
 import '../database/database.dart';
+import '../database/overrides_schema.dart';
+import 'custom_fields_section.dart';
 
 const _monthAbbrev = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -77,17 +79,19 @@ class _ImportedFieldRow extends StatelessWidget {
 /// ADR-04, mechanisms B1 (flutter_form_builder) and C1 (PageView): one
 /// editable form per item, swipeable and button-navigable between items.
 ///
-/// Edits the base imported fields only (name, extra) -- ADR-04 depends on
-/// ADR-03's override/merge layer for override-field editing, and ADR-03 is
-/// still Held, so this screen doesn't invent that layer ahead of it.
+/// Edits the base imported fields (name, extra) in the Editable form, and
+/// (REQ-043 b) the declared custom fields, which save to the overrides table
+/// (ADR-03, Accepted) by importedId, never to the imported item row.
 class ItemDetailScreen extends StatefulWidget {
-  const ItemDetailScreen({
+  ItemDetailScreen({
     super.key,
     required this.database,
     required this.items,
     required this.initialIndex,
-  });
+    List<CustomColumn>? registry,
+  }) : registry = registry ?? customColumns;
 
+  final List<CustomColumn> registry;
   final AppDatabase database;
   final List<CollectionItem> items;
   final int initialIndex;
@@ -230,12 +234,39 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         name: 'extra',
                         decoration: const InputDecoration(labelText: 'Extra'),
                       ),
+                      if (widget.registry.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'CUSTOM FIELDS',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(letterSpacing: 1.2),
+                          ),
+                        ),
+                        CustomFieldsSection(
+                          database: widget.database,
+                          importedId: item.importedId,
+                          formKey: formKey,
+                          registry: widget.registry,
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           final state = formKey.currentState;
                           if (state != null && state.saveAndValidate()) {
-                            _save(item, state.value);
+                            await _save(item, state.value);
+                            if (widget.registry.isNotEmpty) {
+                              await widget.database.saveCustomFields(
+                                item.importedId,
+                                collectCustomValues(
+                                  widget.registry,
+                                  state.value,
+                                ),
+                                registry: widget.registry,
+                              );
+                            }
                           }
                         },
                         child: const Text('Save'),
