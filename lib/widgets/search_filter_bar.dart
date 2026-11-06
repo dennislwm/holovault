@@ -415,6 +415,9 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
   }
 
   bool get isText => _field != null && fieldIsText(_field!, widget.registry);
+  bool get isDate =>
+      _field != null &&
+      customColumnFor(_field!, widget.registry)?.type == CustomColumnType.date;
 
   @override
   Widget build(BuildContext context) {
@@ -472,6 +475,25 @@ class _AddClauseSheetState extends State<_AddClauseSheet> {
                     ),
                 ],
                 onChanged: (value) => setState(() => _textValue = value),
+              )
+            else if (isDate)
+              OutlinedButton(
+                onPressed: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: now,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime(2100),
+                    initialEntryMode: DatePickerEntryMode.calendar,
+                  );
+                  if (picked != null) {
+                    setState(() => _valueController.text = formatDay(picked));
+                  }
+                },
+                child: Text(
+                  _valueController.text.isEmpty ? 'Pick a date' : _valueController.text,
+                ),
               )
             else
               TextField(

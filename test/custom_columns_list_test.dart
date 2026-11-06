@@ -44,12 +44,12 @@ void main() {
     expect(sortKeyLabel('value', _registry), 'Value');
   });
 
-  test('column and sort id lists: built-ins first, dates not sortable', () {
+  test('column and sort id lists: built-ins first, dates sortable (f)', () {
     final cols = columnIdsFor(_registry);
     expect(cols.sublist(0, sortKeyIds.length), sortKeyIds);
     expect(cols.sublist(sortKeyIds.length).first, 'cf.tag');
     expect(cols, contains('cf.when'));
-    expect(sortableIdsFor(_registry), isNot(contains('cf.when')));
+    expect(sortableIdsFor(_registry), contains('cf.when'));
     expect(sortableIdsFor(_registry), contains('cf.wish'));
   });
 
@@ -88,9 +88,9 @@ void main() {
     expect(_order(sortItems(items, 'cf.cost', true, registry: _registry)), [2, 1]);
   });
 
-  test('sort: date, removed and unknown keys leave the order unchanged', () {
+  test('sort: removed and unknown keys leave the order unchanged', () {
     final items = [_item(2, when: DateTime(2026)), _item(1, when: DateTime(2025))];
-    for (final k in ['cf.when', 'cf.gone', 'bogus']) {
+    for (final k in ['cf.gone', 'bogus']) {
       expect(_order(sortItems(items, k, true, registry: _registry)), [2, 1]);
     }
   });

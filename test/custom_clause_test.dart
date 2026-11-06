@@ -90,15 +90,140 @@ void main() {
     expect(loaded.clauses.length, 2);
   });
 
-  test('picker lists built-ins then declared custom fields, without bool and date', () {
+  test('picker lists built-ins then custom fields then date fields, without bool', () {
     final ids = pickerFieldIds(const [], registry);
     expect(ids.take(SearchField.values.length), [for (final f in SearchField.values) f.name]);
-    expect(ids.skip(SearchField.values.length), ['cf.txt', 'cf.pick', 'cf.whole', 'cf.dec']);
+    expect(
+      ids.skip(SearchField.values.length),
+      ['cf.txt', 'cf.pick', 'cf.whole', 'cf.dec', 'cf.when'],
+    );
+    expect(pickerFieldLabel('cf.when', registry), 'when (date)');
+    expect(operatorsForId('cf.when', registry), SearchOperator.values);
     expect(pickerFieldLabel('cf.pick', registry), 'pick (choice)');
     expect(pickerFieldLabel('rarity', registry), 'Rarity');
     expect(operatorsForId('cf.pick', registry).length, 2);
     expect(operatorsForId('cf.dec', registry), SearchOperator.values);
     expect(distinctValuesForId('cf.pick', items, registry), ['LP', 'NM']);
+  });
+
+  group('date fields (f)', () {
+    MergedItem at(String name, DateTime? d) => MergedItem(
+          id: 1,
+          importedId: name,
+          name: name,
+          dateAdded: d,
+        );
+    final days = [
+      at('prev', DateTime(2025, 5, 31, 23, 59)),
+      at('start', DateTime(2025, 6, 1, 0, 0)),
+      at('end', DateTime(2025, 6, 1, 23, 59)),
+      at('next', DateTime(2025, 6, 2, 0, 0)),
+      at('none', null),
+    ];
+    Future<List<String>> hit(SearchOperator op, String v) => names(days, cc('when', op, v));
+
+    test('every operator compares calendar days, never time of day', () async {
+      expect(await hit(SearchOperator.equal, '2025-06-01'), ['start', 'end']);
+      expect(await hit(SearchOperator.notEqual, '2025-06-01'), ['prev', 'next']);
+      expect(await hit(SearchOperator.greaterThan, '2025-06-01'), ['next']);
+      expect(await hit(SearchOperator.greaterThanOrEqual, '2025-06-01'), ['start', 'end', 'next']);
+      expect(await hit(SearchOperator.lessThan, '2025-06-01'), ['prev']);
+      expect(await hit(SearchOperator.lessThanOrEqual, '2025-06-01'), ['prev', 'start', 'end']);
+    });
+
+    test('an invalid or empty clause value never matches or throws', () async {
+      for (final v in ['', 'abc', '2025-6-1', '2025-02-31', '2025-06-01 10:00']) {
+        for (final op in SearchOperator.values) {
+          expect(await hit(op, v), isEmpty, reason: '$op "$v"');
+        }
+      }
+    });
+
+    test('a UTC item value is converted with toLocal before comparing', () async {
+      final utc = DateTime.utc(2025, 6, 1, 23, 59);
+      final local = utc.toLocal();
+      final key = '${local.year}-${local.month.toString().padLeft(2, '0')}-'
+          '${local.day.toString().padLeft(2, '0')}';
+      expect(formatDay(utc), key);
+      expect(await names([at('u', utc)], cc('when', SearchOperator.equal, key)), ['u']);
+    });
+
+    test('clause JSON round trip keeps the yyyy-MM-dd string', () {
+      final c = cc('when', SearchOperator.greaterThanOrEqual, '2025-06-01');
+      final back = SearchClause.tryFromJson(
+        jsonDecode(jsonEncode(c.toJson())) as Map<String, dynamic>,
+        registry,
+      )!;
+      expect(back.value, '2025-06-01');
+      expect(back.fieldLabel, 'when');
+    });
+
+    test('sort ignores time of day, nulls last both ways, ties stable', () {
+      expect(sortableIdsFor(registry), contains('cf.when'));
+      List<String> s(bool asc) =>
+          sortItems(days.reversed.toList(), 'cf.when', asc, registry: registry)
+              .map((i) => i.name)
+              .toList();
+      // 'end' and 'start' share a day: incoming (reversed) order is kept.
+      expect(s(true), ['prev', 'end', 'start', 'next', 'none']);
+      expect(s(false), ['next', 'end', 'start', 'prev', 'none']);
+    });
+  });
+
+  testWidgets('a date clause is added through the SDK date dialog and narrows the list',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    // Tall surface: the date entry is the last item of the Field menu.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final dated = [
+      MergedItem(id: 1, importedId: 'a', name: 'a', dateAdded: DateTime(2020, 1, 1, 23, 59)),
+      MergedItem(id: 2, importedId: 'b', name: 'b', dateAdded: DateTime(2020, 1, 2)),
+    ];
+    var shown = dated;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchFilterBar(
+            prefsKeyPrefix: 'd',
+            items: dated,
+            registry: registry,
+            onFiltered: (f) => shown = f,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add clause'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Field').last);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('when (date)'),
+      100,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('when (date)').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Operator').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('=').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pick a date'));
+    await tester.pumpAndSettle();
+    // The dialog opens on today; type mode is a toggle in the same dialog.
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '01/01/2020');
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('2020-01-01'), findsOneWidget);
+    await tester.tap(find.text('Add').last);
+    await tester.pumpAndSettle();
+
+    expect(shown.map((i) => i.name), ['a']);
+    expect(find.text('when = 2020-01-01'), findsOneWidget);
   });
 
   testWidgets('adding a clause on a custom field narrows the list', (tester) async {

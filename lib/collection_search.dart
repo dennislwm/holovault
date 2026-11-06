@@ -113,12 +113,17 @@ class SearchClause {
 
 /// REQ-043 (e): the Add clause picker's field ids: built-ins (rival rule
 /// applied) then declared custom ones. Bool (no clause behaviour specified)
-/// and date (slice (f)) are not offered.
-List<String> pickerFieldIds(List<SearchClause> existing, [List<CustomColumn>? registry]) => [
-      for (final f in availableFields(existing)) f.name,
-      for (final c in registry ?? customColumns)
-        if (c.type != CustomColumnType.bool && c.type != CustomColumnType.date) customId(c.name),
-    ];
+/// is not offered; date is, last among the types in declaration order.
+List<String> pickerFieldIds(List<SearchClause> existing, [List<CustomColumn>? registry]) {
+  final reg = registry ?? customColumns;
+  return [
+    for (final f in availableFields(existing)) f.name,
+    for (final c in reg)
+      if (c.type != CustomColumnType.bool && c.type != CustomColumnType.date) customId(c.name),
+    for (final c in reg)
+      if (c.type == CustomColumnType.date) customId(c.name),
+  ];
+}
 
 /// Picker label: built-in label, or `name (type)` for a custom field.
 String pickerFieldLabel(String id, [List<CustomColumn>? registry]) {
@@ -211,12 +216,37 @@ bool _matchesClause(MergedItem item, SearchClause clause, DateTime now, List<Cus
   if (builtIn != null) {
     actual = _numericFieldValue(item, builtIn, now);
   } else {
-    final v = customColumnFor(clause.fieldId, registry)?.value(item);
+    final c = customColumnFor(clause.fieldId, registry);
+    final v = c?.value(item);
+    if (c?.type == CustomColumnType.date) {
+      final target = _clauseDayKey(clause.value);
+      if (v is! DateTime || target == null) return false;
+      return _compare(clause.op, _dayKey(v), target);
+    }
     actual = v is num ? v : null;
   }
   final target = num.tryParse(clause.value);
   if (actual == null || target == null) return false;
-  switch (clause.op) {
+  return _compare(clause.op, actual, target);
+}
+
+/// REQ-043 (f): a calendar day as a comparable int (local date, no time).
+int _dayKey(DateTime d) {
+  final l = d.toLocal();
+  return l.year * 10000 + l.month * 100 + l.day;
+}
+
+/// Day key of a stored `yyyy-MM-dd` clause value; null when it is not one.
+int? _clauseDayKey(String s) {
+  if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(s)) return null;
+  final d = DateTime.tryParse(s);
+  // Reject roll-over such as 2025-02-31.
+  if (d == null || d.day != int.parse(s.substring(8))) return null;
+  return _dayKey(d);
+}
+
+bool _compare(SearchOperator op, num actual, num target) {
+  switch (op) {
     case SearchOperator.equal:
       return actual == target;
     case SearchOperator.notEqual:
@@ -319,12 +349,8 @@ List<String> columnIdsFor([List<CustomColumn>? registry]) => [
       for (final c in registry ?? customColumns) customId(c.name),
     ];
 
-/// Ids a list can sort by: as [columnIdsFor] minus date columns (slice (f)).
-List<String> sortableIdsFor([List<CustomColumn>? registry]) => [
-      ...sortKeyIds,
-      for (final c in registry ?? customColumns)
-        if (c.type != CustomColumnType.date) customId(c.name),
-    ];
+/// Ids a list can sort by: every column id (date columns since slice (f)).
+List<String> sortableIdsFor([List<CustomColumn>? registry]) => columnIdsFor(registry);
 
 /// Label for [id]; an id that names nothing known returns itself, never throws.
 String sortKeyLabel(String id, [List<CustomColumn>? registry]) => switch (id) {
@@ -348,18 +374,24 @@ Comparable? customSortValue(CustomColumn c, MergedItem item) {
   return switch (c.type) {
     CustomColumnType.text || CustomColumnType.choice => v is String ? v.toLowerCase() : null,
     CustomColumnType.int || CustomColumnType.real || CustomColumnType.bool => _customNum(v),
-    CustomColumnType.date => null,
+    CustomColumnType.date => v is DateTime ? _dayKey(v) : null,
   } as Comparable?;
 }
 
 String _two(int n) => n.toString().padLeft(2, '0');
+
+/// Local calendar date as yyyy-MM-dd (the cell text and the clause value).
+String formatDay(DateTime d) {
+  final l = d.toLocal();
+  return '${l.year.toString().padLeft(4, '0')}-${_two(l.month)}-${_two(l.day)}';
+}
 
 /// Row cell text of a custom column; a date is the calendar date only.
 String? customCellText(CustomColumn c, MergedItem item) {
   final v = c.value(item);
   if (v == null) return null;
   return switch (v) {
-    DateTime d => '${d.year.toString().padLeft(4, '0')}-${_two(d.month)}-${_two(d.day)}',
+    DateTime d => formatDay(d),
     bool b => b ? 'Yes' : 'No',
     _ => '$v',
   };
