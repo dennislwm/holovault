@@ -127,7 +127,7 @@ String schemaErrorMessage(Object? error) {
 class CollectionDistributionCard extends StatelessWidget {
   const CollectionDistributionCard({super.key, required this.items});
 
-  final List<CollectionItem> items;
+  final List<MergedItem> items;
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +178,7 @@ class CollectionDistributionCard extends StatelessWidget {
 }
 
 /// ADR-04, mechanism A1: a mobile-width list of collection items, reactive
-/// to the underlying drift table via [AppDatabase.watchAllItems].
+/// to the underlying drift table via [AppDatabase.watchMergedItems].
 class CollectionListScreen extends StatelessWidget {
   const CollectionListScreen({
     super.key,
@@ -254,8 +254,8 @@ class CollectionListScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<CollectionItem>>(
-        stream: database.watchAllItems(),
+      body: StreamBuilder<List<MergedItem>>(
+        stream: database.watchMergedItems(),
         builder: (context, snapshot) {
           // REQ-018 (ADR-07): an unrecognized on-disk schema version makes
           // the underlying stream error with UnsupportedSchemaVersionException
@@ -299,14 +299,14 @@ class _FilterableCollectionList extends StatefulWidget {
   const _FilterableCollectionList({required this.database, required this.items});
 
   final AppDatabase database;
-  final List<CollectionItem> items;
+  final List<MergedItem> items;
 
   @override
   State<_FilterableCollectionList> createState() => _FilterableCollectionListState();
 }
 
 class _FilterableCollectionListState extends State<_FilterableCollectionList> {
-  List<CollectionItem> _filtered = const [];
+  List<MergedItem> _filtered = const [];
   // REQ-042 (b): the screen's initial sort; the strip persists the user's.
   String _sortKey = nameSortKey;
   bool _sortAsc = true;

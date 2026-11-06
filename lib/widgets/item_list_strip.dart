@@ -29,8 +29,8 @@ class ItemListStrip extends StatefulWidget {
   });
 
   final String prefsKeyPrefix;
-  final List<CollectionItem> filtered;
-  final List<CollectionItem> whole;
+  final List<MergedItem> filtered;
+  final List<MergedItem> whole;
   final String sortKey;
   final bool ascending;
   final void Function(String key, bool ascending) onChanged;
@@ -86,7 +86,7 @@ class _ItemListStripState extends State<ItemListStrip> {
     await prefs.setString(_colsPref, jsonEncode(ids));
   }
 
-  double _total(List<CollectionItem> items) =>
+  double _total(List<MergedItem> items) =>
       collectionDistribution(items).values.fold(0.0, (sum, v) => sum + v);
 
   @override

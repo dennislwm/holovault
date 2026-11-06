@@ -10,7 +10,7 @@ import 'collection_list_screen.dart' show schemaErrorMessage;
 import 'item_detail_screen.dart';
 
 /// ADR-12 (superseded by ADR-19), ADR-19 Option 1: a cumulative value-trend
-/// chart over `watchAllItems()`, filterable via the shared
+/// chart over `watchMergedItems()`, filterable via the shared
 /// [SearchFilterBar] (search term + clause builder), narrowing the same way
 /// [CollectionListScreen]'s (ADR-18) does -- via [filterCollectionItems].
 /// The filter's search term/clause list persist across restart through
@@ -25,14 +25,14 @@ class ValueTrendScreen extends StatefulWidget {
 }
 
 class _ValueTrendScreenState extends State<ValueTrendScreen> {
-  List<CollectionItem> _filtered = const [];
+  List<MergedItem> _filtered = const [];
   // REQ-034: cached once, not re-created per build -- SearchFilterBar's
   // onFiltered callback setState()s this very State, and re-calling
-  // watchAllItems() on every build would hand it a freshly-subscribed
+  // watchMergedItems() on every build would hand it a freshly-subscribed
   // stream (a new emitted list identity) each time, which its own
   // didUpdateWidget would read as "items changed" and recompute again,
   // looping forever under pumpAndSettle.
-  late final Stream<List<CollectionItem>> _itemsStream = widget.database.watchAllItems();
+  late final Stream<List<MergedItem>> _itemsStream = widget.database.watchMergedItems();
   // REQ-042 (b): the screen's initial sort; the strip persists the user's.
   String _sortKey = SearchField.value.name;
   bool _sortAsc = false;
@@ -44,11 +44,11 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Collection Value')),
-      body: StreamBuilder<List<CollectionItem>>(
+      body: StreamBuilder<List<MergedItem>>(
         stream: _itemsStream,
         builder: (context, snapshot) {
           // REQ-018 (ADR-07): this screen holds its own independent
-          // watchAllItems() stream -- an unrecognized schema version must
+          // watchMergedItems() stream -- an unrecognized schema version must
           // surface here too, not only on CollectionListScreen.
           if (snapshot.hasError) {
             return Center(

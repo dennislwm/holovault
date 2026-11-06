@@ -174,11 +174,8 @@ class AppDatabase extends _$AppDatabase {
     return (await q.get()).map((r) => r.read(col) as String?).toList();
   }
 
-  /// Reactive query for ADR-04's list screen -- emits a new list whenever
-  /// the underlying table changes, so the UI stays live during import/edit.
-  Stream<List<CollectionItem>> watchAllItems() =>
-      select(collectionItems).watch();
-
+  /// Reactive query for ADR-04's list screens (REQ-043 c: merged rows, not
+  /// raw imported rows) -- emits a new list whenever either table changes.
   /// ADR-03, Option 3: `mergedItems` is a real drift `View`, so this gets
   /// native `.watch()` reactivity for free -- no manual polling/refresh
   /// wrapper, unlike Option 2's `customStatement`-created SQL view.

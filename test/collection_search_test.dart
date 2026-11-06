@@ -23,7 +23,7 @@ void main() {
     await db.upsertItem(
       CollectionItemsCompanion.insert(importedId: '2', name: 'B', valueTotal: const Value(150)),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -43,7 +43,7 @@ void main() {
     await db.upsertItem(
       CollectionItemsCompanion.insert(importedId: '2', name: 'B', rarity: const Value('Holo')),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -61,7 +61,7 @@ void main() {
     await db.upsertItem(
       CollectionItemsCompanion.insert(importedId: '2', name: 'B', valueTotal: const Value(100)),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -98,7 +98,7 @@ void main() {
         rarity: const Value('Sealed'),
       ),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -129,7 +129,7 @@ void main() {
         paidTotal: const Value(50),
       ),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -159,7 +159,7 @@ void main() {
         valueTotal: const Value(50),
       ),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -182,14 +182,14 @@ void main() {
     await db.upsertItem(
       CollectionItemsCompanion.insert(importedId: '3', name: 'C', rarity: const Value('Holo')),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     expect(distinctValuesFor(SearchField.rarity, items), ['Holo', 'Sealed']);
   });
 
   group('REQ-041: return fields', () {
-    CollectionItem item(String name, {double? paid, double? value, DateTime? added}) =>
-        CollectionItem(
+    MergedItem item(String name, {double? paid, double? value, DateTime? added}) =>
+        MergedItem(
           id: 1,
           importedId: name,
           name: name,
@@ -200,7 +200,7 @@ void main() {
     final now = DateTime(2026, 1, 1);
 
     Future<List<String>> names(
-      List<CollectionItem> items,
+      List<MergedItem> items,
       SearchField field,
       SearchOperator op,
       String value,
@@ -283,7 +283,7 @@ void main() {
   });
 
   group('REQ-042 (b): sortItems', () {
-    Future<List<CollectionItem>> seed() async {
+    Future<List<MergedItem>> seed() async {
       await db.upsertItem(
         CollectionItemsCompanion.insert(importedId: '1', name: 'b', valueTotal: const Value(20)),
       );
@@ -291,7 +291,7 @@ void main() {
       await db.upsertItem(
         CollectionItemsCompanion.insert(importedId: '3', name: 'C', valueTotal: const Value(10)),
       );
-      return db.select(db.collectionItems).get();
+      return db.select(db.mergedItems).get();
     }
 
     test('an item with no value sorts last in both directions', () async {
@@ -351,7 +351,7 @@ void main() {
         ),
       );
     }
-    final items = await db.watchAllItems().first;
+    final items = await db.watchMergedItems().first;
     expect(maxAbsReturnAnnual([items.last], now: now), 0);
     final byId = {for (final i in items) i.importedId: i};
     final up = annualizedReturnPercent(byId['1']!, now)!;
@@ -370,7 +370,7 @@ void main() {
         rarity: const Value('Holo'),
       ),
     );
-    final item = (await db.watchAllItems().first).single;
+    final item = (await db.watchMergedItems().first).single;
     expect(cellText(item, 'name'), 'A');
     expect(cellText(item, 'extra'), isNull);
     expect(cellText(item, 'quantity'), '×3');

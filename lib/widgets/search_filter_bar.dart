@@ -25,8 +25,8 @@ class SearchFilterBar extends StatefulWidget {
   });
 
   final String prefsKeyPrefix;
-  final List<CollectionItem> items;
-  final void Function(List<CollectionItem> filtered) onFiltered;
+  final List<MergedItem> items;
+  final void Function(List<MergedItem> filtered) onFiltered;
 
   @override
   State<SearchFilterBar> createState() => SearchFilterBarState();
@@ -60,7 +60,7 @@ class FilterPreset {
 class SearchFilterBarState extends State<SearchFilterBar> {
   String _searchTerm = '';
   final List<SearchClause> _clauses = [];
-  List<CollectionItem> _filtered = const [];
+  List<MergedItem> _filtered = const [];
   // REQ-033: owned here, not by the TextField itself -- this State is never
   // virtualized (each screen uses it as a single ListView/Column item), so
   // it's safe from the Element-destruction risk an uncontrolled TextField
@@ -344,7 +344,7 @@ class SearchFilterBarState extends State<SearchFilterBar> {
 /// dropdown can hide a return field whose rival is already in use.
 void showAddClauseSheet(
   BuildContext context,
-  List<CollectionItem> narrowed,
+  List<MergedItem> narrowed,
   void Function(SearchClause) onAdd, {
   List<SearchClause> existing = const [],
 }) {
@@ -369,7 +369,7 @@ class _AddClauseSheet extends StatefulWidget {
     required this.existing,
   });
 
-  final List<CollectionItem> narrowed;
+  final List<MergedItem> narrowed;
   final void Function(SearchClause) onAdd;
   final List<SearchClause> existing;
 

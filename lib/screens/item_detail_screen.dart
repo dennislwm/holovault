@@ -17,7 +17,7 @@ String _formatDate(DateTime date) =>
 
 /// REQ-014: gradeType/gradeSubtype are always paired concepts in real data
 /// (e.g. "PSA" + "10 GEM-MT") -- shown as one combined field, not two.
-String? _gradeText(CollectionItem item) {
+String? _gradeText(MergedItem item) {
   final parts = [item.gradeType, item.gradeSubtype].whereType<String>();
   return parts.isEmpty ? null : parts.join(' ');
 }
@@ -26,7 +26,7 @@ String? _gradeText(CollectionItem item) {
 /// display order. Excludes brandName/valueCurrency/paidCurrency/groupName/
 /// groupWishlist/tag (constant across every real row, zero variance) and
 /// id/importedId/tcgplayerId/pricechartingId/doubleholoId (internal keys).
-List<MapEntry<String, String>> _importedFields(CollectionItem item) {
+List<MapEntry<String, String>> _importedFields(MergedItem item) {
   final entries = <MapEntry<String, String?>>[
     MapEntry('Set', item.setName),
     MapEntry('Discriminator', item.discriminator),
@@ -93,7 +93,7 @@ class ItemDetailScreen extends StatefulWidget {
 
   final List<CustomColumn> registry;
   final AppDatabase database;
-  final List<CollectionItem> items;
+  final List<MergedItem> items;
   final int initialIndex;
 
   @override
@@ -112,7 +112,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     super.dispose();
   }
 
-  Future<void> _save(CollectionItem item, Map<String, dynamic> values) {
+  Future<void> _save(MergedItem item, Map<String, dynamic> values) {
     // Only name/extra are set here -- every other column stays absent, so
     // drift's DoUpdate leaves the item's imported typed fields untouched.
     return widget.database.upsertItem(

@@ -71,6 +71,21 @@ void main() {
       expect(cleared.addCost, 12.5);
     });
 
+    test('REQ-043 c: merged stream carries custom values, null without overrides, omits hidden rows', () async {
+      await db.upsertItem(
+        CollectionItemsCompanion.insert(importedId: 'c2', name: 'Blastoise'),
+      );
+      await db.saveCustomFields('c1', {'serialNo': 'X1'});
+      await db.saveCustomFields('gone', {'serialNo': 'H1'});
+
+      final items = await db.watchMergedItems().first;
+      final byId = {for (final i in items) i.importedId: i};
+
+      expect(byId.keys.toSet(), {'c1', 'c2'});
+      expect(byId['c1']!.serialNo, 'X1');
+      expect(byId['c2']!.serialNo, isNull);
+    });
+
     test('suggestions include a value held only by a hidden row', () async {
       await db.saveCustomFields('c1', {'preGrade': 'Near Mint'});
       await db.saveCustomFields('gone', {'preGrade': 'Played'});
@@ -81,7 +96,7 @@ void main() {
     testWidgets('invalid input saves nothing; valid input saves the override', (
       tester,
     ) async {
-      final item = (await tester.runAsync(() => db.select(db.collectionItems).get()))!
+      final item = (await tester.runAsync(() => db.select(db.mergedItems).get()))!
           .single;
       await tester.runAsync(
         () => db.saveCustomFields('c1', {'addCost': 1.0}),

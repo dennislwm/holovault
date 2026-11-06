@@ -33,11 +33,11 @@ class BestReturnsScreen extends StatefulWidget {
 }
 
 class _BestReturnsScreenState extends State<BestReturnsScreen> {
-  List<CollectionItem> _filtered = const [];
+  List<MergedItem> _filtered = const [];
   // REQ-034: see ValueTrendScreen's identical field -- same feedback-loop
   // risk from SearchFilterBar's onFiltered callback setState()ing this
   // State.
-  late final Stream<List<CollectionItem>> _itemsStream = widget.database.watchAllItems();
+  late final Stream<List<MergedItem>> _itemsStream = widget.database.watchMergedItems();
   int _limit = _defaultLimit;
   bool _loadedPersisted = false;
   // REQ-042 (b): the screen's initial sort (Return descending, as before);
@@ -77,11 +77,11 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Best Returns')),
-      body: StreamBuilder<List<CollectionItem>>(
+      body: StreamBuilder<List<MergedItem>>(
         stream: _itemsStream,
         builder: (context, snapshot) {
           // REQ-018 (ADR-07): this screen holds its own independent
-          // watchAllItems() stream -- an unrecognized schema version must
+          // watchMergedItems() stream -- an unrecognized schema version must
           // surface here too, not only on the other two tabs.
           if (snapshot.hasError) {
             return Center(

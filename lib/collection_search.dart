@@ -89,12 +89,12 @@ class SearchClause {
   );
 }
 
-int? _daysHeld(CollectionItem item, DateTime now) {
+int? _daysHeld(MergedItem item, DateTime now) {
   final added = item.dateAdded;
   return added == null ? null : now.difference(added).inDays;
 }
 
-num? _numericFieldValue(CollectionItem item, SearchField field, DateTime now) {
+num? _numericFieldValue(MergedItem item, SearchField field, DateTime now) {
   switch (field) {
     case SearchField.value:
       return item.valueTotal;
@@ -119,7 +119,7 @@ num? _numericFieldValue(CollectionItem item, SearchField field, DateTime now) {
   }
 }
 
-String? textFieldValue(CollectionItem item, SearchField field) {
+String? textFieldValue(MergedItem item, SearchField field) {
   switch (field) {
     case SearchField.rarity:
       return item.rarity;
@@ -139,7 +139,7 @@ String? textFieldValue(CollectionItem item, SearchField field) {
   }
 }
 
-bool _matchesClause(CollectionItem item, SearchClause clause, DateTime now) {
+bool _matchesClause(MergedItem item, SearchClause clause, DateTime now) {
   if (clause.field.isText) {
     final actual = textFieldValue(item, clause.field);
     if (actual == null) return false;
@@ -170,19 +170,19 @@ bool _matchesClause(CollectionItem item, SearchClause clause, DateTime now) {
 /// each clause as a [CustomConstraint] rather than [ComparisonConstraint]
 /// so a null field value (an unset paidTotal/dateAdded/etc.) is handled
 /// explicitly -- it never matches any clause, not even `!=`.
-Future<List<CollectionItem>> filterCollectionItems(
-  List<CollectionItem> items, {
+Future<List<MergedItem>> filterCollectionItems(
+  List<MergedItem> items, {
   required String searchTerm,
   required List<SearchClause> clauses,
   DateTime? now,
 }) {
   final today = now ?? DateTime.now();
-  final filter = QueryFilter<CollectionItem>(
+  final filter = QueryFilter<MergedItem>(
     ascending: true,
     searchTerm: searchTerm,
     constraints: [
       for (final clause in clauses)
-        CustomConstraint<CollectionItem>(
+        CustomConstraint<MergedItem>(
           customComparator: (item) => _matchesClause(item, clause, today),
         ),
     ],
@@ -197,7 +197,7 @@ Future<List<CollectionItem>> filterCollectionItems(
 /// ADR-18: real distinct values for a text field, scoped to [narrowed] --
 /// the items still matching every clause already added -- so the value
 /// picker never offers a choice that would already yield zero results.
-List<String> distinctValuesFor(SearchField field, List<CollectionItem> narrowed) {
+List<String> distinctValuesFor(SearchField field, List<MergedItem> narrowed) {
   final values = <String>{};
   for (final item in narrowed) {
     final v = textFieldValue(item, field);
@@ -229,15 +229,15 @@ String sortKeyLabel(String id) => switch (id) {
 /// REQ-042 (b): [items] ordered by [key], an item with no value for it
 /// always last (ascending or descending). Unknown [key] returns the list
 /// order unchanged. Stable: equal keys keep their incoming order.
-List<CollectionItem> sortItems(
-  List<CollectionItem> items,
+List<MergedItem> sortItems(
+  List<MergedItem> items,
   String key,
   bool ascending, {
   DateTime? now,
 }) {
   if (!sortKeyIds.contains(key)) return items;
   final today = now ?? DateTime.now();
-  Comparable? valueOf(CollectionItem i) {
+  Comparable? valueOf(MergedItem i) {
     if (key == nameSortKey) return i.name.toLowerCase();
     if (key == extraSortKey) return i.extra?.toLowerCase();
     final field = SearchField.values.byName(key);
@@ -266,7 +266,7 @@ List<CollectionItem> sortItems(
 /// therefore equals the sum over every item, making this function safe
 /// to reuse for a whole-list total (REQ-032's matching-value/percentage),
 /// not just the three-way distribution card it was originally written for.
-Map<String, double> collectionDistribution(List<CollectionItem> items) {
+Map<String, double> collectionDistribution(List<MergedItem> items) {
   final totals = {'Sealed': 0.0, 'Graded': 0.0, 'Ungraded': 0.0};
   for (final item in items) {
     final category = item.rarity == 'Sealed'
@@ -282,7 +282,7 @@ Map<String, double> collectionDistribution(List<CollectionItem> items) {
 /// REQ-042 (c), ADR-22: the text a row cell shows for column [id], or null
 /// when the item has no value for it. Money to two decimals, percent to one,
 /// quantity as `×N`, text fields verbatim.
-String? cellText(CollectionItem item, String id, {DateTime? now}) {
+String? cellText(MergedItem item, String id, {DateTime? now}) {
   if (id == nameSortKey) return item.name;
   if (id == extraSortKey) return item.extra;
   final field = SearchField.values.byName(id);
@@ -299,7 +299,7 @@ String? cellText(CollectionItem item, String id, {DateTime? now}) {
 
 /// REQ-042 (c): the largest absolute annual return over [items], the
 /// denominator for the row's return bar. 0 when none has a return.
-double maxAbsReturnAnnual(List<CollectionItem> items, {DateTime? now}) {
+double maxAbsReturnAnnual(List<MergedItem> items, {DateTime? now}) {
   final today = now ?? DateTime.now();
   var max = 0.0;
   for (final i in items) {

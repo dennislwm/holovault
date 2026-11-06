@@ -21,7 +21,7 @@ class ItemRow extends StatelessWidget {
     this.returnBarMax = 0,
   });
 
-  final CollectionItem item;
+  final MergedItem item;
   final List<String> columns;
   final double returnBarMax;
 

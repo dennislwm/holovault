@@ -12,7 +12,7 @@ class AnnualizedReturn {
     required this.percent,
   });
 
-  final CollectionItem item;
+  final MergedItem item;
   final int daysHeld;
   final double percent;
 }
@@ -23,7 +23,7 @@ class AnnualizedReturn {
 /// `SearchField.returnAnnual` (filtering) so the two cannot drift.
 // ponytail: no min-days guard -- a 1-day hold inflates via 365/days; a Days
 // held clause covers it (REQ-035 did the same for min_days).
-double? annualizedReturnPercent(CollectionItem item, DateTime now) {
+double? annualizedReturnPercent(MergedItem item, DateTime now) {
   final paid = item.paidPerUnit;
   final value = item.valuePerUnit;
   final dateAdded = item.dateAdded;
@@ -38,7 +38,7 @@ double? annualizedReturnPercent(CollectionItem item, DateTime now) {
 /// REQ-041: one item's plain (non-annualized) return percent,
 /// `(valuePerUnit / paidPerUnit - 1) * 100`. Same null/non-positive-paid
 /// rule as [annualizedReturnPercent], but needs no dateAdded.
-double? baseReturnPercent(CollectionItem item) {
+double? baseReturnPercent(MergedItem item) {
   final paid = item.paidPerUnit;
   final value = item.valuePerUnit;
   if (paid == null || paid <= 0) return null;
@@ -55,7 +55,7 @@ double? baseReturnPercent(CollectionItem item) {
 /// job (`SearchField.paidPerUnit`/`.valuePerUnit`/`.daysHeld`) -- this
 /// function only computes the ranking, on whatever's already filtered.
 List<AnnualizedReturn> computeAnnualizedReturns(
-  List<CollectionItem> items, {
+  List<MergedItem> items, {
   required int limit,
   DateTime? now,
 }) {

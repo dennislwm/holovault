@@ -14,9 +14,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  final items = const [
-    CollectionItem(id: 1, importedId: '1', name: 'Charizard', rarity: 'Holo'),
-    CollectionItem(id: 2, importedId: '2', name: 'Blastoise', rarity: 'Sealed'),
+  const items = [
+    MergedItem(id: 1, importedId: '1', name: 'Charizard', rarity: 'Holo'),
+    MergedItem(id: 2, importedId: '2', name: 'Blastoise', rarity: 'Sealed'),
   ];
 
   Future<void> pump(WidgetTester tester) async {

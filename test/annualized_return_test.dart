@@ -34,7 +34,7 @@ void main() {
         dateAdded: Value(DateTime(2025, 1, 1)),
       ),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final ranked = computeAnnualizedReturns(items, limit: 10, now: DateTime(2026, 1, 1));
 
@@ -51,7 +51,7 @@ void main() {
         dateAdded: Value(DateTime(2025, 1, 1)),
       ),
     );
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final ranked = computeAnnualizedReturns(items, limit: 10, now: DateTime(2026, 1, 1));
 
@@ -70,7 +70,7 @@ void main() {
         ),
       );
     }
-    final items = await db.select(db.collectionItems).get();
+    final items = await db.select(db.mergedItems).get();
 
     final ranked = computeAnnualizedReturns(items, limit: 2, now: DateTime(2026, 1, 1));
 
@@ -78,7 +78,7 @@ void main() {
   });
 
   group('REQ-041: per-item return percent', () {
-    CollectionItem item({double? paid, double? value, DateTime? added}) => CollectionItem(
+    MergedItem item({double? paid, double? value, DateTime? added}) => MergedItem(
       id: 1,
       importedId: 'x',
       name: 'X',

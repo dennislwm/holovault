@@ -706,21 +706,21 @@ void main() {
     'rarity/gradeType combination outside the "obvious" Sealed/Ungraded cases',
     () {
       final items = [
-        CollectionItem(
+        const MergedItem(
           id: 1,
           importedId: '1',
           name: 'A',
           rarity: 'Sealed',
           valueTotal: 10,
         ),
-        CollectionItem(
+        const MergedItem(
           id: 2,
           importedId: '2',
           name: 'B',
           gradeType: 'Ungraded',
           valueTotal: 20,
         ),
-        CollectionItem(
+        const MergedItem(
           id: 3,
           importedId: '3',
           name: 'C',
@@ -729,7 +729,7 @@ void main() {
         ),
         // Neither rarity nor gradeType set at all -- still falls into the
         // unconditional final "Graded" branch, not skipped.
-        CollectionItem(id: 4, importedId: '4', name: 'D', valueTotal: 40),
+        const MergedItem(id: 4, importedId: '4', name: 'D', valueTotal: 40),
       ];
 
       final bucketSum = collectionDistribution(
