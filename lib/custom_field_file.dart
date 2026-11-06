@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'database/database.dart';
 import 'database/overrides_schema.dart';
 
 /// REQ-047 (ADR-23 Option 1): the custom-field export file. Pure: no I/O.
@@ -106,6 +107,22 @@ CustomFieldsParse parseCustomFieldsFile(
     out.add((importedId: id, values: parsed));
   }
   return CustomFieldsParse.ok(out);
+}
+
+/// REQ-048: parse the whole file, then write it in one transaction. Returns
+/// the message to show; a refusal writes nothing. Other errors propagate.
+Future<String> importCustomFieldsText(
+  AppDatabase db,
+  String text, [
+  List<CustomColumn>? registry,
+]) async {
+  final cols = registry ?? customColumns;
+  final parsed = parseCustomFieldsFile(text, cols);
+  if (parsed.rows == null) {
+    return 'Custom field import refused: ${parsed.refusal}';
+  }
+  await db.importCustomFieldRows(parsed.rows!, registry: cols);
+  return 'Imported ${parsed.rows!.length} custom field row(s)';
 }
 
 // Sentinel for "value does not fit".

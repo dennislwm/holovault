@@ -282,23 +282,11 @@ class CollectionListScreen extends StatelessWidget {
         );
         return;
       }
-      final parsed = parseCustomFieldsFile(
+      final message = await importCustomFieldsText(
+        database,
         utf8.decode(await File(path).readAsBytes()),
       );
-      if (parsed.rows == null) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Custom field import refused: ${parsed.refusal}'),
-          ),
-        );
-        return;
-      }
-      await database.importCustomFieldRows(parsed.rows!);
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Imported ${parsed.rows!.length} custom field row(s)'),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text('Custom field import failed: $e')),

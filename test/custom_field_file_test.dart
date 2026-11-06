@@ -217,6 +217,48 @@ void main() {
       expect(await snapshot(), before);
     });
 
+    test('REQ-048 importCustomFieldsText: refusals write nothing, valid writes', () async {
+      await db.saveCustomFields('c1', {'serialNo': 'keep'});
+      final before = await snapshot();
+      final refused = <(String, String)>[
+        ('{nope', 'Custom field import refused: the file is not valid JSON'),
+        (_file([], version: 2), 'Custom field import refused: unknown format version 2'),
+        (
+          _file([_row('c1', {'serialNo': 'new'}), _row('x', {'addCost': 'bad'})]),
+          'Custom field import refused: row 2 field addCost does not fit its real type',
+        ),
+      ];
+      for (final (text, msg) in refused) {
+        expect(await importCustomFieldsText(db, text, reg), msg);
+        expect(await snapshot(), before);
+      }
+      final ok = _file([_row('c1', {'serialNo': 'new'}), _row('x', {'addCost': 2.5})]);
+      expect(await importCustomFieldsText(db, ok, reg), 'Imported 2 custom field row(s)');
+      final rows = await db.overrideRows();
+      expect(rows.map((r) => r.importedId), ['c1', 'x']);
+      expect(rows[0].values['serialNo'], 'new');
+      expect(rows[1].values['addCost'], 2.5);
+    });
+
+    test('REQ-048 round trip through two real stores gives the same file', () async {
+      await db.saveCustomFields('c1', {
+        'serialNo': 'S1',
+        'addCost': null,
+        'eventDate': DateTime(2026, 2, 3, 4, 5, 6),
+      });
+      await db.saveCustomFields('gone', {'serialNo': 'D', 'addCost': 9.5});
+      final first = buildCustomFieldsFile(await db.overrideRows());
+      final dir2 = Directory.systemTemp.createTempSync('holovault_cff2_');
+      final db2 = AppDatabase.withExecutor(NativeDatabase(File('${dir2.path}/t.sqlite')));
+      try {
+        expect(await importCustomFieldsText(db2, first), 'Imported 2 custom field row(s)');
+        expect(buildCustomFieldsFile(await db2.overrideRows()), first);
+      } finally {
+        await db2.close();
+        dir2.deleteSync(recursive: true);
+      }
+    });
+
     test('importCustomFieldRows is one transaction: a failing row rolls back all', () async {
       await db.saveCustomFields('c1', {'serialNo': 'keep'});
       final before = await snapshot();

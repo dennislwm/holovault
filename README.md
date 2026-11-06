@@ -75,6 +75,9 @@ carries two items that move only the custom-field values, not the collection:
 2. **Import custom fields** -- pick such a file. The whole file is checked
    first; if anything is wrong the import is refused and nothing is written.
 
+Rows for items that are no longer imported are kept and exported. Import
+skips any column that is no longer declared.
+
 ## Override columns
 
 Requires: [ADR-03](https://github.com/dennislwm/holovault/wiki/decisions/adr-03-override-schema-extension)
