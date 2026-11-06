@@ -1,3 +1,8 @@
 {
-  "extraColumns": []
+  "extraColumns": [
+    { "name": "serialNo", "type": "text" },
+    { "name": "preGrade", "type": "text" },
+    { "name": "addCost", "type": "real" },
+    { "name": "releasePrice", "type": "real" }
+  ]
 }
