@@ -15,6 +15,10 @@ const _columnTemplates = {
   'bool': 'BoolColumn get {name} => boolean().nullable()();',
   'int': 'IntColumn get {name} => integer().nullable()();',
   'real': 'RealColumn get {name} => real().nullable()();',
+  // REQ-043: choice stores as text (the type only changes the editor input
+  // and the registry entry); date is a nullable date-time.
+  'choice': 'TextColumn get {name} => text().nullable()();',
+  'date': 'DateTimeColumn get {name} => dateTime().nullable()();',
 };
 
 // ponytail: drift's Table DSL class has no `$columns`-style introspection
@@ -41,6 +45,15 @@ void main() {
   final extraColumns = (config['extraColumns'] as List? ?? [])
       .cast<Map<String, dynamic>>();
 
+  File('lib/database/overrides_schema.dart')
+      .writeAsStringSync(generateOverridesSchema(extraColumns));
+  stdout.writeln(
+    'Wrote lib/database/overrides_schema.dart (${extraColumns.length} extra column(s))',
+  );
+}
+
+/// Pure: declared columns in, generated Dart source out (tested directly).
+String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
   final columnLines = extraColumns.map((col) {
     final name = col['name'] as String;
     final type = col['type'] as String;
@@ -54,7 +67,14 @@ void main() {
     return '  ${template.replaceAll('{name}', _camelCase(name))}';
   }).join('\n');
 
-  final selectBaseCols = _collectionItemsColumns
+  final registryLines = extraColumns.map((col) {
+    final name = col['name'] as String;
+    final field = _camelCase(name);
+    return "  CustomColumn('$name', CustomColumnType.${col['type']}, "
+        '(r) => r.$field, (t) => t.$field),';
+  }).join('\n');
+
+  final selectBaseCols =_collectionItemsColumns
       .map((name) => '    collectionItems.$name,')
       .join('\n');
 
@@ -89,12 +109,27 @@ void main() {
     ..writeln('      collectionItemOverrides.importedId.equalsExp(collectionItems.importedId),')
     ..writeln('    ),')
     ..writeln('  ]);')
-    ..writeln('}');
+    ..writeln('}')
+    ..writeln()
+    ..writeln('// REQ-043: registry of the declared custom columns. `type` is here')
+    ..writeln('// because drift column info cannot tell choice from text. `value`')
+    ..writeln('// reads the merged row (no reflection in Flutter); `column` is the')
+    ..writeln('// overrides-table column (migration, choice suggestion query).')
+    ..writeln('enum CustomColumnType { text, bool, int, real, choice, date }')
+    ..writeln()
+    ..writeln('class CustomColumn {')
+    ..writeln('  final String name;')
+    ..writeln('  final CustomColumnType type;')
+    ..writeln('  final Object? Function(MergedItem) value;')
+    ..writeln('  final GeneratedColumn Function(\$CollectionItemOverridesTable) column;')
+    ..writeln('  CustomColumn(this.name, this.type, this.value, this.column);')
+    ..writeln('}')
+    ..writeln()
+    ..writeln('final customColumns = <CustomColumn>[')
+    ..write(registryLines.isEmpty ? '' : '$registryLines\n')
+    ..writeln('];');
 
-  File('lib/database/overrides_schema.dart').writeAsStringSync(buffer.toString());
-  stdout.writeln(
-    'Wrote lib/database/overrides_schema.dart (${extraColumns.length} extra column(s))',
-  );
+  return buffer.toString();
 }
 
 String _camelCase(String snake) {

@@ -6,6 +6,10 @@ import 'database.dart';
 
 class CollectionItemOverrides extends Table {
   TextColumn get importedId => text().unique()();
+  TextColumn get serialNo => text().nullable()();
+  TextColumn get preGrade => text().nullable()();
+  RealColumn get addCost => real().nullable()();
+  RealColumn get releasePrice => real().nullable()();
 }
 
 abstract class MergedItems extends View {
@@ -38,6 +42,10 @@ abstract class MergedItems extends View {
     collectionItems.doubleholoId,
     collectionItems.dateAdded,
     collectionItems.tag,
+    collectionItemOverrides.serialNo,
+    collectionItemOverrides.preGrade,
+    collectionItemOverrides.addCost,
+    collectionItemOverrides.releasePrice,
   ]).from(collectionItems).join([
     leftOuterJoin(
       collectionItemOverrides,
@@ -45,3 +53,24 @@ abstract class MergedItems extends View {
     ),
   ]);
 }
+
+// REQ-043: registry of the declared custom columns. `type` is here
+// because drift column info cannot tell choice from text. `value`
+// reads the merged row (no reflection in Flutter); `column` is the
+// overrides-table column (migration, choice suggestion query).
+enum CustomColumnType { text, bool, int, real, choice, date }
+
+class CustomColumn {
+  final String name;
+  final CustomColumnType type;
+  final Object? Function(MergedItem) value;
+  final GeneratedColumn Function($CollectionItemOverridesTable) column;
+  CustomColumn(this.name, this.type, this.value, this.column);
+}
+
+final customColumns = <CustomColumn>[
+  CustomColumn('serialNo', CustomColumnType.text, (r) => r.serialNo, (t) => t.serialNo),
+  CustomColumn('preGrade', CustomColumnType.choice, (r) => r.preGrade, (t) => t.preGrade),
+  CustomColumn('addCost', CustomColumnType.real, (r) => r.addCost, (t) => t.addCost),
+  CustomColumn('releasePrice', CustomColumnType.real, (r) => r.releasePrice, (t) => t.releasePrice),
+];

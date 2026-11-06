@@ -1139,8 +1139,33 @@ class $CollectionItemOverridesTable extends CollectionItemOverrides
       type: DriftSqlType.string,
       requiredDuringInsert: true,
       defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _serialNoMeta =
+      const VerificationMeta('serialNo');
   @override
-  List<GeneratedColumn> get $columns => [importedId];
+  late final GeneratedColumn<String> serialNo = GeneratedColumn<String>(
+      'serial_no', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _preGradeMeta =
+      const VerificationMeta('preGrade');
+  @override
+  late final GeneratedColumn<String> preGrade = GeneratedColumn<String>(
+      'pre_grade', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _addCostMeta =
+      const VerificationMeta('addCost');
+  @override
+  late final GeneratedColumn<double> addCost = GeneratedColumn<double>(
+      'add_cost', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _releasePriceMeta =
+      const VerificationMeta('releasePrice');
+  @override
+  late final GeneratedColumn<double> releasePrice = GeneratedColumn<double>(
+      'release_price', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [importedId, serialNo, preGrade, addCost, releasePrice];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1160,6 +1185,24 @@ class $CollectionItemOverridesTable extends CollectionItemOverrides
     } else if (isInserting) {
       context.missing(_importedIdMeta);
     }
+    if (data.containsKey('serial_no')) {
+      context.handle(_serialNoMeta,
+          serialNo.isAcceptableOrUnknown(data['serial_no']!, _serialNoMeta));
+    }
+    if (data.containsKey('pre_grade')) {
+      context.handle(_preGradeMeta,
+          preGrade.isAcceptableOrUnknown(data['pre_grade']!, _preGradeMeta));
+    }
+    if (data.containsKey('add_cost')) {
+      context.handle(_addCostMeta,
+          addCost.isAcceptableOrUnknown(data['add_cost']!, _addCostMeta));
+    }
+    if (data.containsKey('release_price')) {
+      context.handle(
+          _releasePriceMeta,
+          releasePrice.isAcceptableOrUnknown(
+              data['release_price']!, _releasePriceMeta));
+    }
     return context;
   }
 
@@ -1171,6 +1214,14 @@ class $CollectionItemOverridesTable extends CollectionItemOverrides
     return CollectionItemOverride(
       importedId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}imported_id'])!,
+      serialNo: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}serial_no']),
+      preGrade: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pre_grade']),
+      addCost: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}add_cost']),
+      releasePrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}release_price']),
     );
   }
 
@@ -1183,17 +1234,50 @@ class $CollectionItemOverridesTable extends CollectionItemOverrides
 class CollectionItemOverride extends DataClass
     implements Insertable<CollectionItemOverride> {
   final String importedId;
-  const CollectionItemOverride({required this.importedId});
+  final String? serialNo;
+  final String? preGrade;
+  final double? addCost;
+  final double? releasePrice;
+  const CollectionItemOverride(
+      {required this.importedId,
+      this.serialNo,
+      this.preGrade,
+      this.addCost,
+      this.releasePrice});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['imported_id'] = Variable<String>(importedId);
+    if (!nullToAbsent || serialNo != null) {
+      map['serial_no'] = Variable<String>(serialNo);
+    }
+    if (!nullToAbsent || preGrade != null) {
+      map['pre_grade'] = Variable<String>(preGrade);
+    }
+    if (!nullToAbsent || addCost != null) {
+      map['add_cost'] = Variable<double>(addCost);
+    }
+    if (!nullToAbsent || releasePrice != null) {
+      map['release_price'] = Variable<double>(releasePrice);
+    }
     return map;
   }
 
   CollectionItemOverridesCompanion toCompanion(bool nullToAbsent) {
     return CollectionItemOverridesCompanion(
       importedId: Value(importedId),
+      serialNo: serialNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serialNo),
+      preGrade: preGrade == null && nullToAbsent
+          ? const Value.absent()
+          : Value(preGrade),
+      addCost: addCost == null && nullToAbsent
+          ? const Value.absent()
+          : Value(addCost),
+      releasePrice: releasePrice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(releasePrice),
     );
   }
 
@@ -1202,6 +1286,10 @@ class CollectionItemOverride extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CollectionItemOverride(
       importedId: serializer.fromJson<String>(json['importedId']),
+      serialNo: serializer.fromJson<String?>(json['serialNo']),
+      preGrade: serializer.fromJson<String?>(json['preGrade']),
+      addCost: serializer.fromJson<double?>(json['addCost']),
+      releasePrice: serializer.fromJson<double?>(json['releasePrice']),
     );
   }
   @override
@@ -1209,63 +1297,122 @@ class CollectionItemOverride extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'importedId': serializer.toJson<String>(importedId),
+      'serialNo': serializer.toJson<String?>(serialNo),
+      'preGrade': serializer.toJson<String?>(preGrade),
+      'addCost': serializer.toJson<double?>(addCost),
+      'releasePrice': serializer.toJson<double?>(releasePrice),
     };
   }
 
-  CollectionItemOverride copyWith({String? importedId}) =>
+  CollectionItemOverride copyWith(
+          {String? importedId,
+          Value<String?> serialNo = const Value.absent(),
+          Value<String?> preGrade = const Value.absent(),
+          Value<double?> addCost = const Value.absent(),
+          Value<double?> releasePrice = const Value.absent()}) =>
       CollectionItemOverride(
         importedId: importedId ?? this.importedId,
+        serialNo: serialNo.present ? serialNo.value : this.serialNo,
+        preGrade: preGrade.present ? preGrade.value : this.preGrade,
+        addCost: addCost.present ? addCost.value : this.addCost,
+        releasePrice:
+            releasePrice.present ? releasePrice.value : this.releasePrice,
       );
   CollectionItemOverride copyWithCompanion(
       CollectionItemOverridesCompanion data) {
     return CollectionItemOverride(
       importedId:
           data.importedId.present ? data.importedId.value : this.importedId,
+      serialNo: data.serialNo.present ? data.serialNo.value : this.serialNo,
+      preGrade: data.preGrade.present ? data.preGrade.value : this.preGrade,
+      addCost: data.addCost.present ? data.addCost.value : this.addCost,
+      releasePrice: data.releasePrice.present
+          ? data.releasePrice.value
+          : this.releasePrice,
     );
   }
 
   @override
   String toString() {
     return (StringBuffer('CollectionItemOverride(')
-          ..write('importedId: $importedId')
+          ..write('importedId: $importedId, ')
+          ..write('serialNo: $serialNo, ')
+          ..write('preGrade: $preGrade, ')
+          ..write('addCost: $addCost, ')
+          ..write('releasePrice: $releasePrice')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => importedId.hashCode;
+  int get hashCode =>
+      Object.hash(importedId, serialNo, preGrade, addCost, releasePrice);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is CollectionItemOverride && other.importedId == this.importedId);
+      (other is CollectionItemOverride &&
+          other.importedId == this.importedId &&
+          other.serialNo == this.serialNo &&
+          other.preGrade == this.preGrade &&
+          other.addCost == this.addCost &&
+          other.releasePrice == this.releasePrice);
 }
 
 class CollectionItemOverridesCompanion
     extends UpdateCompanion<CollectionItemOverride> {
   final Value<String> importedId;
+  final Value<String?> serialNo;
+  final Value<String?> preGrade;
+  final Value<double?> addCost;
+  final Value<double?> releasePrice;
   final Value<int> rowid;
   const CollectionItemOverridesCompanion({
     this.importedId = const Value.absent(),
+    this.serialNo = const Value.absent(),
+    this.preGrade = const Value.absent(),
+    this.addCost = const Value.absent(),
+    this.releasePrice = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CollectionItemOverridesCompanion.insert({
     required String importedId,
+    this.serialNo = const Value.absent(),
+    this.preGrade = const Value.absent(),
+    this.addCost = const Value.absent(),
+    this.releasePrice = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : importedId = Value(importedId);
   static Insertable<CollectionItemOverride> custom({
     Expression<String>? importedId,
+    Expression<String>? serialNo,
+    Expression<String>? preGrade,
+    Expression<double>? addCost,
+    Expression<double>? releasePrice,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (importedId != null) 'imported_id': importedId,
+      if (serialNo != null) 'serial_no': serialNo,
+      if (preGrade != null) 'pre_grade': preGrade,
+      if (addCost != null) 'add_cost': addCost,
+      if (releasePrice != null) 'release_price': releasePrice,
       if (rowid != null) 'rowid': rowid,
     });
   }
 
   CollectionItemOverridesCompanion copyWith(
-      {Value<String>? importedId, Value<int>? rowid}) {
+      {Value<String>? importedId,
+      Value<String?>? serialNo,
+      Value<String?>? preGrade,
+      Value<double?>? addCost,
+      Value<double?>? releasePrice,
+      Value<int>? rowid}) {
     return CollectionItemOverridesCompanion(
       importedId: importedId ?? this.importedId,
+      serialNo: serialNo ?? this.serialNo,
+      preGrade: preGrade ?? this.preGrade,
+      addCost: addCost ?? this.addCost,
+      releasePrice: releasePrice ?? this.releasePrice,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1275,6 +1422,18 @@ class CollectionItemOverridesCompanion
     final map = <String, Expression>{};
     if (importedId.present) {
       map['imported_id'] = Variable<String>(importedId.value);
+    }
+    if (serialNo.present) {
+      map['serial_no'] = Variable<String>(serialNo.value);
+    }
+    if (preGrade.present) {
+      map['pre_grade'] = Variable<String>(preGrade.value);
+    }
+    if (addCost.present) {
+      map['add_cost'] = Variable<double>(addCost.value);
+    }
+    if (releasePrice.present) {
+      map['release_price'] = Variable<double>(releasePrice.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1286,6 +1445,10 @@ class CollectionItemOverridesCompanion
   String toString() {
     return (StringBuffer('CollectionItemOverridesCompanion(')
           ..write('importedId: $importedId, ')
+          ..write('serialNo: $serialNo, ')
+          ..write('preGrade: $preGrade, ')
+          ..write('addCost: $addCost, ')
+          ..write('releasePrice: $releasePrice, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1317,6 +1480,10 @@ class MergedItem extends DataClass {
   final String? doubleholoId;
   final DateTime? dateAdded;
   final String? tag;
+  final String? serialNo;
+  final String? preGrade;
+  final double? addCost;
+  final double? releasePrice;
   const MergedItem(
       {required this.id,
       required this.importedId,
@@ -1341,7 +1508,11 @@ class MergedItem extends DataClass {
       this.pricechartingId,
       this.doubleholoId,
       this.dateAdded,
-      this.tag});
+      this.tag,
+      this.serialNo,
+      this.preGrade,
+      this.addCost,
+      this.releasePrice});
   factory MergedItem.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
@@ -1370,6 +1541,10 @@ class MergedItem extends DataClass {
       doubleholoId: serializer.fromJson<String?>(json['doubleholoId']),
       dateAdded: serializer.fromJson<DateTime?>(json['dateAdded']),
       tag: serializer.fromJson<String?>(json['tag']),
+      serialNo: serializer.fromJson<String?>(json['serialNo']),
+      preGrade: serializer.fromJson<String?>(json['preGrade']),
+      addCost: serializer.fromJson<double?>(json['addCost']),
+      releasePrice: serializer.fromJson<double?>(json['releasePrice']),
     );
   }
   @override
@@ -1400,6 +1575,10 @@ class MergedItem extends DataClass {
       'doubleholoId': serializer.toJson<String?>(doubleholoId),
       'dateAdded': serializer.toJson<DateTime?>(dateAdded),
       'tag': serializer.toJson<String?>(tag),
+      'serialNo': serializer.toJson<String?>(serialNo),
+      'preGrade': serializer.toJson<String?>(preGrade),
+      'addCost': serializer.toJson<double?>(addCost),
+      'releasePrice': serializer.toJson<double?>(releasePrice),
     };
   }
 
@@ -1427,7 +1606,11 @@ class MergedItem extends DataClass {
           Value<String?> pricechartingId = const Value.absent(),
           Value<String?> doubleholoId = const Value.absent(),
           Value<DateTime?> dateAdded = const Value.absent(),
-          Value<String?> tag = const Value.absent()}) =>
+          Value<String?> tag = const Value.absent(),
+          Value<String?> serialNo = const Value.absent(),
+          Value<String?> preGrade = const Value.absent(),
+          Value<double?> addCost = const Value.absent(),
+          Value<double?> releasePrice = const Value.absent()}) =>
       MergedItem(
         id: id ?? this.id,
         importedId: importedId ?? this.importedId,
@@ -1462,6 +1645,11 @@ class MergedItem extends DataClass {
             doubleholoId.present ? doubleholoId.value : this.doubleholoId,
         dateAdded: dateAdded.present ? dateAdded.value : this.dateAdded,
         tag: tag.present ? tag.value : this.tag,
+        serialNo: serialNo.present ? serialNo.value : this.serialNo,
+        preGrade: preGrade.present ? preGrade.value : this.preGrade,
+        addCost: addCost.present ? addCost.value : this.addCost,
+        releasePrice:
+            releasePrice.present ? releasePrice.value : this.releasePrice,
       );
   @override
   String toString() {
@@ -1489,7 +1677,11 @@ class MergedItem extends DataClass {
           ..write('pricechartingId: $pricechartingId, ')
           ..write('doubleholoId: $doubleholoId, ')
           ..write('dateAdded: $dateAdded, ')
-          ..write('tag: $tag')
+          ..write('tag: $tag, ')
+          ..write('serialNo: $serialNo, ')
+          ..write('preGrade: $preGrade, ')
+          ..write('addCost: $addCost, ')
+          ..write('releasePrice: $releasePrice')
           ..write(')'))
         .toString();
   }
@@ -1519,7 +1711,11 @@ class MergedItem extends DataClass {
         pricechartingId,
         doubleholoId,
         dateAdded,
-        tag
+        tag,
+        serialNo,
+        preGrade,
+        addCost,
+        releasePrice
       ]);
   @override
   bool operator ==(Object other) =>
@@ -1548,7 +1744,11 @@ class MergedItem extends DataClass {
           other.pricechartingId == this.pricechartingId &&
           other.doubleholoId == this.doubleholoId &&
           other.dateAdded == this.dateAdded &&
-          other.tag == this.tag);
+          other.tag == this.tag &&
+          other.serialNo == this.serialNo &&
+          other.preGrade == this.preGrade &&
+          other.addCost == this.addCost &&
+          other.releasePrice == this.releasePrice);
 }
 
 class $MergedItemsView extends ViewInfo<$MergedItemsView, MergedItem>
@@ -1586,7 +1786,11 @@ class $MergedItemsView extends ViewInfo<$MergedItemsView, MergedItem>
         pricechartingId,
         doubleholoId,
         dateAdded,
-        tag
+        tag,
+        serialNo,
+        preGrade,
+        addCost,
+        releasePrice
       ];
   @override
   String get aliasedName => _alias ?? entityName;
@@ -1648,6 +1852,14 @@ class $MergedItemsView extends ViewInfo<$MergedItemsView, MergedItem>
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date_added']),
       tag: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}tag']),
+      serialNo: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}serial_no']),
+      preGrade: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pre_grade']),
+      addCost: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}add_cost']),
+      releasePrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}release_price']),
     );
   }
 
@@ -1749,6 +1961,22 @@ class $MergedItemsView extends ViewInfo<$MergedItemsView, MergedItem>
       'tag', aliasedName, true,
       generatedAs: GeneratedAs(collectionItems.tag, false),
       type: DriftSqlType.string);
+  late final GeneratedColumn<String> serialNo = GeneratedColumn<String>(
+      'serial_no', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItemOverrides.serialNo, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<String> preGrade = GeneratedColumn<String>(
+      'pre_grade', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItemOverrides.preGrade, false),
+      type: DriftSqlType.string);
+  late final GeneratedColumn<double> addCost = GeneratedColumn<double>(
+      'add_cost', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItemOverrides.addCost, false),
+      type: DriftSqlType.double);
+  late final GeneratedColumn<double> releasePrice = GeneratedColumn<double>(
+      'release_price', aliasedName, true,
+      generatedAs: GeneratedAs(collectionItemOverrides.releasePrice, false),
+      type: DriftSqlType.double);
   @override
   $MergedItemsView createAlias(String alias) {
     return $MergedItemsView(attachedDatabase, alias);
@@ -2249,11 +2477,19 @@ typedef $$CollectionItemsTableProcessedTableManager = ProcessedTableManager<
 typedef $$CollectionItemOverridesTableCreateCompanionBuilder
     = CollectionItemOverridesCompanion Function({
   required String importedId,
+  Value<String?> serialNo,
+  Value<String?> preGrade,
+  Value<double?> addCost,
+  Value<double?> releasePrice,
   Value<int> rowid,
 });
 typedef $$CollectionItemOverridesTableUpdateCompanionBuilder
     = CollectionItemOverridesCompanion Function({
   Value<String> importedId,
+  Value<String?> serialNo,
+  Value<String?> preGrade,
+  Value<double?> addCost,
+  Value<double?> releasePrice,
   Value<int> rowid,
 });
 
@@ -2268,6 +2504,18 @@ class $$CollectionItemOverridesTableFilterComposer
   });
   ColumnFilters<String> get importedId => $composableBuilder(
       column: $table.importedId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get serialNo => $composableBuilder(
+      column: $table.serialNo, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get preGrade => $composableBuilder(
+      column: $table.preGrade, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get addCost => $composableBuilder(
+      column: $table.addCost, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get releasePrice => $composableBuilder(
+      column: $table.releasePrice, builder: (column) => ColumnFilters(column));
 }
 
 class $$CollectionItemOverridesTableOrderingComposer
@@ -2281,6 +2529,19 @@ class $$CollectionItemOverridesTableOrderingComposer
   });
   ColumnOrderings<String> get importedId => $composableBuilder(
       column: $table.importedId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get serialNo => $composableBuilder(
+      column: $table.serialNo, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get preGrade => $composableBuilder(
+      column: $table.preGrade, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get addCost => $composableBuilder(
+      column: $table.addCost, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get releasePrice => $composableBuilder(
+      column: $table.releasePrice,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$CollectionItemOverridesTableAnnotationComposer
@@ -2294,6 +2555,18 @@ class $$CollectionItemOverridesTableAnnotationComposer
   });
   GeneratedColumn<String> get importedId => $composableBuilder(
       column: $table.importedId, builder: (column) => column);
+
+  GeneratedColumn<String> get serialNo =>
+      $composableBuilder(column: $table.serialNo, builder: (column) => column);
+
+  GeneratedColumn<String> get preGrade =>
+      $composableBuilder(column: $table.preGrade, builder: (column) => column);
+
+  GeneratedColumn<double> get addCost =>
+      $composableBuilder(column: $table.addCost, builder: (column) => column);
+
+  GeneratedColumn<double> get releasePrice => $composableBuilder(
+      column: $table.releasePrice, builder: (column) => column);
 }
 
 class $$CollectionItemOverridesTableTableManager extends RootTableManager<
@@ -2328,18 +2601,34 @@ class $$CollectionItemOverridesTableTableManager extends RootTableManager<
                   $db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> importedId = const Value.absent(),
+            Value<String?> serialNo = const Value.absent(),
+            Value<String?> preGrade = const Value.absent(),
+            Value<double?> addCost = const Value.absent(),
+            Value<double?> releasePrice = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               CollectionItemOverridesCompanion(
             importedId: importedId,
+            serialNo: serialNo,
+            preGrade: preGrade,
+            addCost: addCost,
+            releasePrice: releasePrice,
             rowid: rowid,
           ),
           createCompanionCallback: ({
             required String importedId,
+            Value<String?> serialNo = const Value.absent(),
+            Value<String?> preGrade = const Value.absent(),
+            Value<double?> addCost = const Value.absent(),
+            Value<double?> releasePrice = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               CollectionItemOverridesCompanion.insert(
             importedId: importedId,
+            serialNo: serialNo,
+            preGrade: preGrade,
+            addCost: addCost,
+            releasePrice: releasePrice,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   /// ADR-09: v1 had only importedId/name/extra. v2 adds the 19 real
   /// ShinyExport fields -- all nullable, so no default value is needed for
@@ -100,6 +100,19 @@ class AppDatabase extends _$AppDatabase {
         // gated by drift's own schemaVersion tracking (`from < 3` is only
         // true during the single migration off an older schema).
         await m.createTable(collectionItemOverrides);
+        await m.createView(mergedItems);
+        handled = true;
+      }
+      if (from == 3) {
+        // REQ-043: v3 installs have an overrides table with only the key
+        // column. Add every declared custom column and rebuild the view so
+        // it selects them. nullable, so existing rows need no default.
+        // (from < 3 needs none of this: createTable above already used the
+        // current definition.)
+        for (final c in customColumns) {
+          await m.addColumn(collectionItemOverrides, c.column(collectionItemOverrides));
+        }
+        await m.drop(mergedItems);
         await m.createView(mergedItems);
         handled = true;
       }
