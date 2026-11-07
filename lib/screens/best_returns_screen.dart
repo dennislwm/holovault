@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../annualized_return.dart';
 import '../database/database.dart';
 import '../collection_search.dart';
+import '../set_lookup.dart' show setLookupVersion;
 import '../widgets/search_filter_bar.dart';
 import '../widgets/item_list_strip.dart';
 import '../widgets/item_row.dart';
@@ -73,8 +74,15 @@ class _BestReturnsScreenState extends State<BestReturnsScreen> {
     await prefs.setInt(_limitKey, _limit);
   }
 
+  /// REQ-053: rebuilds when the set lookup changes (the row stream does not
+  /// watch the lookup table); same wrapper as [CollectionListScreen].
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+    valueListenable: setLookupVersion,
+    builder: (context, version, child) => _scaffold(context),
+  );
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Best Returns')),
       body: StreamBuilder<List<MergedItem>>(

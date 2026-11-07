@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../database/database.dart';
 import '../collection_search.dart';
+import '../set_lookup.dart' show setLookupVersion;
 import '../widgets/search_filter_bar.dart';
 import '../widgets/item_list_strip.dart';
 import '../widgets/item_row.dart';
@@ -40,8 +41,15 @@ class _ValueTrendScreenState extends State<ValueTrendScreen> {
   static const _defaultColumns = ['name', 'setName', 'value', 'paid'];
   List<String> _columns = _defaultColumns;
 
+  /// REQ-053: rebuilds when the set lookup changes (the row stream does not
+  /// watch the lookup table); same wrapper as [CollectionListScreen].
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+    valueListenable: setLookupVersion,
+    builder: (context, version, child) => _scaffold(context),
+  );
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Collection Value')),
       body: StreamBuilder<List<MergedItem>>(

@@ -3,13 +3,44 @@ import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:holovault/collection_search.dart' show customIdPrefix;
 import 'package:holovault/screens/value_trend_screen.dart';
+import 'package:holovault/set_lookup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'helpers.dart';
 
 void main() {
   final fx = WidgetFixture();
+
+  // REQ-053: wiring only; the lookup itself is tested in set_lookup_test.dart.
+  testWidgets('REQ-053: an imported set lookup shows in the language column without a restart',
+      (WidgetTester tester) async {
+    addTearDown(() => setLookup = {});
+    SharedPreferences.setMockInitialValues({
+      'value_trend_filter_columns': jsonEncode(['name', '${customIdPrefix}language']),
+    });
+    await seedItem(
+      fx.db,
+      importedId: 'card-1',
+      name: 'Card',
+      setName: 'Base Set',
+      valueTotal: 100.0,
+      dateAdded: DateTime(2026, 1, 1),
+    );
+    await fx.pumpScreen(tester, ValueTrendScreen(database: fx.db));
+    expect(find.text('ja'), findsNothing);
+
+    await fx.db.replaceSetLookup([
+      (aliasName: 'Base Set', language: 'ja', tcgdexId: null, officialName: null),
+    ]);
+    await refreshSetLookup(fx.db);
+    await tester.pumpAndSettle();
+
+    expect(find.text('ja'), findsOneWidget);
+
+    await disposeAndFlush(tester);
+  });
 
   testWidgets(
     'REQ-015/REQ-034: filtering by a Set name clause narrows the chart total to matching items',
