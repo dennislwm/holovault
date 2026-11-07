@@ -259,9 +259,23 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: () async {
+                          // Same SnackBar pattern as the import/export paths
+                          // in collection_list_screen.dart. Captured before
+                          // the await, hidden first so the newest wins.
+                          final messenger = ScaffoldMessenger.of(context);
+                          void say(String m) => messenger
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(SnackBar(content: Text(m)));
                           final state = formKey.currentState;
-                          if (state != null && state.saveAndValidate()) {
+                          if (state == null || !state.saveAndValidate()) {
+                            say('Fix the highlighted fields');
+                            return;
+                          }
+                          try {
                             await _save(item, state.value);
+                            say('Saved');
+                          } catch (e) {
+                            say('Save failed: $e');
                           }
                         },
                         child: const Text('Save'),

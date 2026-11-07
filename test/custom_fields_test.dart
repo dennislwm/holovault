@@ -291,6 +291,7 @@ void main() {
       await tester.tap(find.text('Save'));
       await tester.pump();
       expect(find.text('Enter a number'), findsOneWidget);
+      expect(find.text('Fix the highlighted fields'), findsOneWidget);
       var row = await tester.runAsync(() => db.mergedItemByImportedId('c1'));
       expect(row!.addCost, 1.0);
 
@@ -298,6 +299,9 @@ void main() {
       await tester.pump();
       await tester.tap(find.text('Save'));
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pump();
+      expect(find.text('Saved'), findsOneWidget);
+      expect(find.text('Fix the highlighted fields'), findsNothing);
       row = await tester.runAsync(() => db.mergedItemByImportedId('c1'));
       expect(row!.addCost, 2.5);
       expect(row.serialNo, isNull);
