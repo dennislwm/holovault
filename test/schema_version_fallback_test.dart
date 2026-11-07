@@ -14,13 +14,12 @@ void main() {
       addTearDown(() => dir.delete(recursive: true));
       final dbFile = File('${dir.path}/stale.sqlite');
 
-      // Seed a stored user_version (5) ahead of anything AppDatabase's
-      // current migration.onUpgrade branches handle (from < 3, from == 3) --
-      // the shape of a rollback to an older app build.
+      // Seed a stored user_version (6) ahead of the current schema version
+      // (5) -- the shape of a rollback to an older app build.
       final db = AppDatabase.withExecutor(
         NativeDatabase(
           dbFile,
-          setup: (rawDb) => rawDb.execute('PRAGMA user_version = 5'),
+          setup: (rawDb) => rawDb.execute('PRAGMA user_version = 6'),
         ),
       );
 

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../collection_search.dart';
 import '../database/database.dart';
 import '../database/overrides_schema.dart';
+import '../set_lookup.dart';
 
 /// ADR-19, Option 1: the search bar + clause-builder mechanism
 /// [CollectionListScreen] (ADR-18) originated, promoted to a shared widget
@@ -26,7 +27,8 @@ class SearchFilterBar extends StatefulWidget {
     this.registry,
   });
 
-  /// REQ-043 (e): declared custom columns; null means [customColumns].
+  /// REQ-043 (e): declared custom columns; null means [readColumns] (stored
+  /// custom columns plus the derived set lookup columns, REQ-052).
   final List<CustomColumn>? registry;
   final String prefsKeyPrefix;
   final List<MergedItem> items;
@@ -375,7 +377,7 @@ void showAddClauseSheet(
       narrowed: narrowed,
       onAdd: onAdd,
       existing: existing,
-      registry: registry ?? customColumns,
+      registry: registry ?? readColumns,
     ),
   );
 }

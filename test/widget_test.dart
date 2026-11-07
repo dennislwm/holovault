@@ -45,6 +45,21 @@ void main() {
     await disposeAndFlush(tester);
   });
 
+  // REQ-052: wiring only. The parser and the store are tested as plain
+  // functions in set_lookup_test.dart.
+  testWidgets('REQ-052: the overflow menu offers Import set lookup', (WidgetTester tester) async {
+    await tester.pumpWidget(HolovaultApp(database: db));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Import set lookup'), findsOneWidget);
+    expect(find.text('Import custom fields'), findsOneWidget);
+
+    await disposeAndFlush(tester);
+  });
+
   testWidgets('REQ-040: app-wide theme is wired in, not Flutter\'s unstyled default',
       (WidgetTester tester) async {
     await tester.pumpWidget(HolovaultApp(database: db));

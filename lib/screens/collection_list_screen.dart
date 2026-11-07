@@ -11,6 +11,8 @@ import '../collection_search.dart';
 import '../custom_field_file.dart';
 import '../database/database.dart';
 import '../import_schema.dart';
+import '../set_lookup.dart';
+import '../set_lookup_file.dart';
 import '../widgets/search_filter_bar.dart';
 import '../widgets/item_list_strip.dart';
 import '../widgets/item_row.dart';
@@ -267,6 +269,35 @@ class CollectionListScreen extends StatelessWidget {
     }
   }
 
+  /// REQ-052 (ADR-24 Option 3): pick a set lookup JSON, validate the whole
+  /// file, then replace the stored lookup in one transaction; refusal writes
+  /// nothing and keeps the previous lookup.
+  Future<void> _handleImportSetLookup(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      final path = picked?.files.single.path;
+      if (path == null) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Set lookup import cancelled')),
+        );
+        return;
+      }
+      final message = await importSetLookupText(
+        database,
+        utf8.decode(await File(path).readAsBytes()),
+      );
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Set lookup import failed: $e')),
+      );
+    }
+  }
+
   /// REQ-047: validate the whole file, then one transaction; refusal writes nothing.
   Future<void> _handleImportCustomFields(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -294,8 +325,15 @@ class CollectionListScreen extends StatelessWidget {
     }
   }
 
+  /// REQ-052: rebuilds when the set lookup changes (the row stream does not
+  /// watch the lookup table).
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<int>(
+    valueListenable: setLookupVersion,
+    builder: (context, version, child) => _scaffold(context),
+  );
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Collection'),
@@ -306,12 +344,15 @@ class CollectionListScreen extends StatelessWidget {
             onPressed: () => _handleImport(context),
           ),
           PopupMenuButton<String>(
-            onSelected: (v) => v == 'export'
-                ? _handleExportCustomFields(context)
-                : _handleImportCustomFields(context),
+            onSelected: (v) => switch (v) {
+              'export' => _handleExportCustomFields(context),
+              'setLookup' => _handleImportSetLookup(context),
+              _ => _handleImportCustomFields(context),
+            },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'export', child: Text('Export custom fields')),
               PopupMenuItem(value: 'import', child: Text('Import custom fields')),
+              PopupMenuItem(value: 'setLookup', child: Text('Import set lookup')),
             ],
           ),
         ],

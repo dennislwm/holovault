@@ -5,6 +5,7 @@ import 'package:local_query_filter/local_query_filter.dart';
 import 'annualized_return.dart';
 import 'database/database.dart';
 import 'database/overrides_schema.dart';
+import 'set_lookup.dart';
 
 /// ADR-18, Option 2: fields an ad hoc clause can target.
 enum SearchField {
@@ -98,7 +99,7 @@ class SearchClause {
     if (op == null) return null;
     final builtIn = SearchField.values.asNameMap()[id];
     if (builtIn != null) return SearchClause(field: builtIn, op: op, value: value);
-    if (customColumnFor(id, registry ?? customColumns) == null) return null;
+    if (customColumnFor(id, registry ?? readColumns) == null) return null;
     return SearchClause.custom(customFieldId: id, op: op, value: value);
   }
 }
@@ -106,7 +107,7 @@ class SearchClause {
 /// REQ-043 (e): the Add clause picker's field ids: built-ins (rival rule
 /// applied) then declared custom ones (REQ-046: every type, date last).
 List<String> pickerFieldIds(List<SearchClause> existing, [List<CustomColumn>? registry]) {
-  final reg = registry ?? customColumns;
+  final reg = registry ?? readColumns;
   return [
     for (final f in availableFields(existing)) f.name,
     for (final c in reg)
@@ -118,7 +119,7 @@ List<String> pickerFieldIds(List<SearchClause> existing, [List<CustomColumn>? re
 
 /// Picker label: built-in label, or `name (type)` for a custom field.
 String pickerFieldLabel(String id, [List<CustomColumn>? registry]) {
-  final c = customColumnFor(id, registry ?? customColumns);
+  final c = customColumnFor(id, registry ?? readColumns);
   return c == null ? sortKeyLabel(id, registry) : '${c.name} (${c.type.name})';
 }
 
@@ -128,7 +129,7 @@ String pickerFieldLabel(String id, [List<CustomColumn>? registry]) {
 bool fieldIsText(String id, [List<CustomColumn>? registry]) {
   final b = SearchField.values.asNameMap()[id];
   if (b != null) return b.isText;
-  final t = customColumnFor(id, registry ?? customColumns)?.type;
+  final t = customColumnFor(id, registry ?? readColumns)?.type;
   return t == CustomColumnType.text || t == CustomColumnType.choice || t == CustomColumnType.bool;
 }
 
@@ -272,7 +273,7 @@ Future<List<MergedItem>> filterCollectionItems(
   List<CustomColumn>? registry,
 }) {
   final today = now ?? DateTime.now();
-  final reg = registry ?? customColumns;
+  final reg = registry ?? readColumns;
   final filter = QueryFilter<MergedItem>(
     ascending: true,
     searchTerm: searchTerm,
@@ -299,7 +300,7 @@ List<String> distinctValuesForId(
   List<MergedItem> narrowed, [
   List<CustomColumn>? registry,
 ]) {
-  final reg = registry ?? customColumns;
+  final reg = registry ?? readColumns;
   if (customColumnFor(id, reg)?.type == CustomColumnType.bool) return const ['true', 'false'];
   final values = <String>{};
   for (final item in narrowed) {
@@ -342,7 +343,7 @@ CustomColumn? customColumnFor(String id, List<CustomColumn> registry) {
 /// Every id a column can show: built-ins first, then declared custom ones.
 List<String> columnIdsFor([List<CustomColumn>? registry]) => [
       ...sortKeyIds,
-      for (final c in registry ?? customColumns) customId(c.name),
+      for (final c in registry ?? readColumns) customId(c.name),
     ];
 
 /// Ids a list can sort by: every column id (date columns since slice (f)).
@@ -353,7 +354,7 @@ String sortKeyLabel(String id, [List<CustomColumn>? registry]) => switch (id) {
       nameSortKey => 'Name',
       extraSortKey => 'Extra',
       _ => SearchField.values.asNameMap()[id]?.label ??
-          customColumnFor(id, registry ?? customColumns)?.name ??
+          customColumnFor(id, registry ?? readColumns)?.name ??
           id,
     };
 
@@ -403,7 +404,7 @@ List<MergedItem> sortItems(
   DateTime? now,
   List<CustomColumn>? registry,
 }) {
-  final reg = registry ?? customColumns;
+  final reg = registry ?? readColumns;
   if (!sortableIdsFor(reg).contains(key)) return items;
   final today = now ?? DateTime.now();
   final custom = customColumnFor(key, reg);
@@ -458,7 +459,7 @@ String? cellText(MergedItem item, String id, {DateTime? now, List<CustomColumn>?
   if (id == extraSortKey) return item.extra;
   final field = SearchField.values.asNameMap()[id];
   if (field == null) {
-    final c = customColumnFor(id, registry ?? customColumns);
+    final c = customColumnFor(id, registry ?? readColumns);
     return c == null ? null : customCellText(c, item);
   }
   if (field.isText) return textFieldValue(item, field);

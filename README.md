@@ -78,6 +78,27 @@ carries two items that move only the custom-field values, not the collection:
 Rows for items that are no longer imported are kept and exported. Import
 skips any column that is no longer declared.
 
+## Import the set lookup
+
+Requires: [ADR-24](https://github.com/dennislwm/holovault/wiki/decisions/adr-24-set-language-on-rows)
+
+The set lookup gives each row a language, a set id and an official set name
+(columns `language`, `setId` and `setOfficialName`, shown, sorted and filtered
+like the custom fields, but read-only). It comes from the sibling repo
+`13pyholostatic`, file `data/set_language.json`.
+
+1. Copy `data/set_language.json` to the phone (for example with AirDrop or Files).
+2. On the Collection tab, open the overflow menu and tap **Import set lookup**.
+3. Pick the file. The whole file is checked first; if anything is wrong the
+   import is refused with a reason and the previous lookup stays.
+4. A good file replaces the stored lookup. Importing the same file again
+   changes nothing.
+
+Only aliases the file marked `exact` for the app `shiny` are used, matched
+against the row's set name. A row whose set name has no such alias shows a
+blank. When a new set appears in a later collection import, run `make language`
+in `13pyholostatic`, copy the new file, and import it again.
+
 ## Override columns
 
 Requires: [ADR-03](https://github.com/dennislwm/holovault/wiki/decisions/adr-03-override-schema-extension)

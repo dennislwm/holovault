@@ -51,8 +51,21 @@ class CollectionItems extends Table {
   TextColumn get tag => text().nullable()();
 }
 
+/// REQ-052 (ADR-24 Option 3): the imported set lookup, one row per alias name
+/// the source file resolved `exact`. Replaced whole by an import, never
+/// written by the collection import or the overrides path.
+class SetLookupRows extends Table {
+  TextColumn get aliasName => text()();
+  TextColumn get language => text()();
+  TextColumn get tcgdexId => text().nullable()();
+  TextColumn get officialName => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {aliasName};
+}
+
 @DriftDatabase(
-  tables: [CollectionItems, CollectionItemOverrides],
+  tables: [CollectionItems, CollectionItemOverrides, SetLookupRows],
   views: [MergedItems],
 )
 class AppDatabase extends _$AppDatabase {
@@ -63,7 +76,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.withExecutor(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   /// ADR-09: v1 had only importedId/name/extra. v2 adds the 19 real
   /// ShinyExport fields -- all nullable, so no default value is needed for
@@ -116,6 +129,12 @@ class AppDatabase extends _$AppDatabase {
         await m.createView(mergedItems);
         handled = true;
       }
+      if (from < 5) {
+        // REQ-052: the set lookup table is new in version 5. Every install
+        // below 5 gets it here, whichever branch above also ran.
+        await m.createTable(setLookupRows);
+        handled = true;
+      }
       // ADR-07, Option 3: `from` matched neither branch above -- an
       // unrecognized/newer/rolled-back schema version. Fail loudly instead
       // of silently no-op'ing and leaving queries to fail later with an
@@ -135,6 +154,31 @@ class AppDatabase extends _$AppDatabase {
       onConflict: DoUpdate((old) => entry, target: [collectionItems.importedId]),
     );
   }
+
+  /// REQ-052: every stored set lookup row.
+  Future<List<SetLookupRow>> allSetLookupRows() => select(setLookupRows).get();
+
+  /// REQ-052: replaces the whole set lookup in one transaction. A failure
+  /// keeps the previous rows. Writes only the lookup table.
+  Future<void> replaceSetLookup(
+    List<
+      ({String aliasName, String language, String? tcgdexId, String? officialName})
+    >
+    rows,
+  ) => transaction(() async {
+    await delete(setLookupRows).go();
+    await batch((b) {
+      b.insertAll(setLookupRows, [
+        for (final r in rows)
+          SetLookupRowsCompanion.insert(
+            aliasName: r.aliasName,
+            language: r.language,
+            tcgdexId: Value(r.tcgdexId),
+            officialName: Value(r.officialName),
+          ),
+      ]);
+    });
+  });
 
   /// REQ-043 (b): the item's merged row (imported + overrides), or null.
   Future<MergedItem?> mergedItemByImportedId(String importedId) =>

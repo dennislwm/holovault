@@ -5,6 +5,7 @@ import 'database/database.dart';
 import 'screens/best_returns_screen.dart';
 import 'screens/collection_list_screen.dart';
 import 'screens/value_trend_screen.dart';
+import 'set_lookup.dart';
 
 void main() {
   runApp(HolovaultApp());
@@ -47,6 +48,13 @@ class HolovaultShell extends StatefulWidget {
 
 class _HolovaultShellState extends State<HolovaultShell> {
   int _tabIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // REQ-052: load the stored set lookup so rows can show their language.
+    refreshSetLookup(widget.database);
+  }
 
   @override
   Widget build(BuildContext context) {

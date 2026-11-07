@@ -1538,6 +1538,287 @@ class CollectionItemOverridesCompanion
   }
 }
 
+class $SetLookupRowsTable extends SetLookupRows
+    with TableInfo<$SetLookupRowsTable, SetLookupRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SetLookupRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _aliasNameMeta =
+      const VerificationMeta('aliasName');
+  @override
+  late final GeneratedColumn<String> aliasName = GeneratedColumn<String>(
+      'alias_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _languageMeta =
+      const VerificationMeta('language');
+  @override
+  late final GeneratedColumn<String> language = GeneratedColumn<String>(
+      'language', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _tcgdexIdMeta =
+      const VerificationMeta('tcgdexId');
+  @override
+  late final GeneratedColumn<String> tcgdexId = GeneratedColumn<String>(
+      'tcgdex_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _officialNameMeta =
+      const VerificationMeta('officialName');
+  @override
+  late final GeneratedColumn<String> officialName = GeneratedColumn<String>(
+      'official_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [aliasName, language, tcgdexId, officialName];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'set_lookup_rows';
+  @override
+  VerificationContext validateIntegrity(Insertable<SetLookupRow> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('alias_name')) {
+      context.handle(_aliasNameMeta,
+          aliasName.isAcceptableOrUnknown(data['alias_name']!, _aliasNameMeta));
+    } else if (isInserting) {
+      context.missing(_aliasNameMeta);
+    }
+    if (data.containsKey('language')) {
+      context.handle(_languageMeta,
+          language.isAcceptableOrUnknown(data['language']!, _languageMeta));
+    } else if (isInserting) {
+      context.missing(_languageMeta);
+    }
+    if (data.containsKey('tcgdex_id')) {
+      context.handle(_tcgdexIdMeta,
+          tcgdexId.isAcceptableOrUnknown(data['tcgdex_id']!, _tcgdexIdMeta));
+    }
+    if (data.containsKey('official_name')) {
+      context.handle(
+          _officialNameMeta,
+          officialName.isAcceptableOrUnknown(
+              data['official_name']!, _officialNameMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {aliasName};
+  @override
+  SetLookupRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SetLookupRow(
+      aliasName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}alias_name'])!,
+      language: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}language'])!,
+      tcgdexId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tcgdex_id']),
+      officialName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}official_name']),
+    );
+  }
+
+  @override
+  $SetLookupRowsTable createAlias(String alias) {
+    return $SetLookupRowsTable(attachedDatabase, alias);
+  }
+}
+
+class SetLookupRow extends DataClass implements Insertable<SetLookupRow> {
+  final String aliasName;
+  final String language;
+  final String? tcgdexId;
+  final String? officialName;
+  const SetLookupRow(
+      {required this.aliasName,
+      required this.language,
+      this.tcgdexId,
+      this.officialName});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['alias_name'] = Variable<String>(aliasName);
+    map['language'] = Variable<String>(language);
+    if (!nullToAbsent || tcgdexId != null) {
+      map['tcgdex_id'] = Variable<String>(tcgdexId);
+    }
+    if (!nullToAbsent || officialName != null) {
+      map['official_name'] = Variable<String>(officialName);
+    }
+    return map;
+  }
+
+  SetLookupRowsCompanion toCompanion(bool nullToAbsent) {
+    return SetLookupRowsCompanion(
+      aliasName: Value(aliasName),
+      language: Value(language),
+      tcgdexId: tcgdexId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(tcgdexId),
+      officialName: officialName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(officialName),
+    );
+  }
+
+  factory SetLookupRow.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SetLookupRow(
+      aliasName: serializer.fromJson<String>(json['aliasName']),
+      language: serializer.fromJson<String>(json['language']),
+      tcgdexId: serializer.fromJson<String?>(json['tcgdexId']),
+      officialName: serializer.fromJson<String?>(json['officialName']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'aliasName': serializer.toJson<String>(aliasName),
+      'language': serializer.toJson<String>(language),
+      'tcgdexId': serializer.toJson<String?>(tcgdexId),
+      'officialName': serializer.toJson<String?>(officialName),
+    };
+  }
+
+  SetLookupRow copyWith(
+          {String? aliasName,
+          String? language,
+          Value<String?> tcgdexId = const Value.absent(),
+          Value<String?> officialName = const Value.absent()}) =>
+      SetLookupRow(
+        aliasName: aliasName ?? this.aliasName,
+        language: language ?? this.language,
+        tcgdexId: tcgdexId.present ? tcgdexId.value : this.tcgdexId,
+        officialName:
+            officialName.present ? officialName.value : this.officialName,
+      );
+  SetLookupRow copyWithCompanion(SetLookupRowsCompanion data) {
+    return SetLookupRow(
+      aliasName: data.aliasName.present ? data.aliasName.value : this.aliasName,
+      language: data.language.present ? data.language.value : this.language,
+      tcgdexId: data.tcgdexId.present ? data.tcgdexId.value : this.tcgdexId,
+      officialName: data.officialName.present
+          ? data.officialName.value
+          : this.officialName,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SetLookupRow(')
+          ..write('aliasName: $aliasName, ')
+          ..write('language: $language, ')
+          ..write('tcgdexId: $tcgdexId, ')
+          ..write('officialName: $officialName')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(aliasName, language, tcgdexId, officialName);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SetLookupRow &&
+          other.aliasName == this.aliasName &&
+          other.language == this.language &&
+          other.tcgdexId == this.tcgdexId &&
+          other.officialName == this.officialName);
+}
+
+class SetLookupRowsCompanion extends UpdateCompanion<SetLookupRow> {
+  final Value<String> aliasName;
+  final Value<String> language;
+  final Value<String?> tcgdexId;
+  final Value<String?> officialName;
+  final Value<int> rowid;
+  const SetLookupRowsCompanion({
+    this.aliasName = const Value.absent(),
+    this.language = const Value.absent(),
+    this.tcgdexId = const Value.absent(),
+    this.officialName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SetLookupRowsCompanion.insert({
+    required String aliasName,
+    required String language,
+    this.tcgdexId = const Value.absent(),
+    this.officialName = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : aliasName = Value(aliasName),
+        language = Value(language);
+  static Insertable<SetLookupRow> custom({
+    Expression<String>? aliasName,
+    Expression<String>? language,
+    Expression<String>? tcgdexId,
+    Expression<String>? officialName,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (aliasName != null) 'alias_name': aliasName,
+      if (language != null) 'language': language,
+      if (tcgdexId != null) 'tcgdex_id': tcgdexId,
+      if (officialName != null) 'official_name': officialName,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SetLookupRowsCompanion copyWith(
+      {Value<String>? aliasName,
+      Value<String>? language,
+      Value<String?>? tcgdexId,
+      Value<String?>? officialName,
+      Value<int>? rowid}) {
+    return SetLookupRowsCompanion(
+      aliasName: aliasName ?? this.aliasName,
+      language: language ?? this.language,
+      tcgdexId: tcgdexId ?? this.tcgdexId,
+      officialName: officialName ?? this.officialName,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (aliasName.present) {
+      map['alias_name'] = Variable<String>(aliasName.value);
+    }
+    if (language.present) {
+      map['language'] = Variable<String>(language.value);
+    }
+    if (tcgdexId.present) {
+      map['tcgdex_id'] = Variable<String>(tcgdexId.value);
+    }
+    if (officialName.present) {
+      map['official_name'] = Variable<String>(officialName.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SetLookupRowsCompanion(')
+          ..write('aliasName: $aliasName, ')
+          ..write('language: $language, ')
+          ..write('tcgdexId: $tcgdexId, ')
+          ..write('officialName: $officialName, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class MergedItem extends DataClass {
   final int id;
   final String importedId;
@@ -2118,13 +2399,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CollectionItemsTable(this);
   late final $CollectionItemOverridesTable collectionItemOverrides =
       $CollectionItemOverridesTable(this);
+  late final $SetLookupRowsTable setLookupRows = $SetLookupRowsTable(this);
   late final $MergedItemsView mergedItems = $MergedItemsView(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [collectionItems, collectionItemOverrides, mergedItems];
+      [collectionItems, collectionItemOverrides, setLookupRows, mergedItems];
 }
 
 typedef $$CollectionItemsTableCreateCompanionBuilder = CollectionItemsCompanion
@@ -2800,6 +3082,165 @@ typedef $$CollectionItemOverridesTableProcessedTableManager
         ),
         CollectionItemOverride,
         PrefetchHooks Function()>;
+typedef $$SetLookupRowsTableCreateCompanionBuilder = SetLookupRowsCompanion
+    Function({
+  required String aliasName,
+  required String language,
+  Value<String?> tcgdexId,
+  Value<String?> officialName,
+  Value<int> rowid,
+});
+typedef $$SetLookupRowsTableUpdateCompanionBuilder = SetLookupRowsCompanion
+    Function({
+  Value<String> aliasName,
+  Value<String> language,
+  Value<String?> tcgdexId,
+  Value<String?> officialName,
+  Value<int> rowid,
+});
+
+class $$SetLookupRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $SetLookupRowsTable> {
+  $$SetLookupRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get aliasName => $composableBuilder(
+      column: $table.aliasName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get language => $composableBuilder(
+      column: $table.language, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tcgdexId => $composableBuilder(
+      column: $table.tcgdexId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get officialName => $composableBuilder(
+      column: $table.officialName, builder: (column) => ColumnFilters(column));
+}
+
+class $$SetLookupRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SetLookupRowsTable> {
+  $$SetLookupRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get aliasName => $composableBuilder(
+      column: $table.aliasName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get language => $composableBuilder(
+      column: $table.language, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tcgdexId => $composableBuilder(
+      column: $table.tcgdexId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get officialName => $composableBuilder(
+      column: $table.officialName,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$SetLookupRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SetLookupRowsTable> {
+  $$SetLookupRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get aliasName =>
+      $composableBuilder(column: $table.aliasName, builder: (column) => column);
+
+  GeneratedColumn<String> get language =>
+      $composableBuilder(column: $table.language, builder: (column) => column);
+
+  GeneratedColumn<String> get tcgdexId =>
+      $composableBuilder(column: $table.tcgdexId, builder: (column) => column);
+
+  GeneratedColumn<String> get officialName => $composableBuilder(
+      column: $table.officialName, builder: (column) => column);
+}
+
+class $$SetLookupRowsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SetLookupRowsTable,
+    SetLookupRow,
+    $$SetLookupRowsTableFilterComposer,
+    $$SetLookupRowsTableOrderingComposer,
+    $$SetLookupRowsTableAnnotationComposer,
+    $$SetLookupRowsTableCreateCompanionBuilder,
+    $$SetLookupRowsTableUpdateCompanionBuilder,
+    (
+      SetLookupRow,
+      BaseReferences<_$AppDatabase, $SetLookupRowsTable, SetLookupRow>
+    ),
+    SetLookupRow,
+    PrefetchHooks Function()> {
+  $$SetLookupRowsTableTableManager(_$AppDatabase db, $SetLookupRowsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SetLookupRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SetLookupRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SetLookupRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> aliasName = const Value.absent(),
+            Value<String> language = const Value.absent(),
+            Value<String?> tcgdexId = const Value.absent(),
+            Value<String?> officialName = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SetLookupRowsCompanion(
+            aliasName: aliasName,
+            language: language,
+            tcgdexId: tcgdexId,
+            officialName: officialName,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String aliasName,
+            required String language,
+            Value<String?> tcgdexId = const Value.absent(),
+            Value<String?> officialName = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SetLookupRowsCompanion.insert(
+            aliasName: aliasName,
+            language: language,
+            tcgdexId: tcgdexId,
+            officialName: officialName,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SetLookupRowsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SetLookupRowsTable,
+    SetLookupRow,
+    $$SetLookupRowsTableFilterComposer,
+    $$SetLookupRowsTableOrderingComposer,
+    $$SetLookupRowsTableAnnotationComposer,
+    $$SetLookupRowsTableCreateCompanionBuilder,
+    $$SetLookupRowsTableUpdateCompanionBuilder,
+    (
+      SetLookupRow,
+      BaseReferences<_$AppDatabase, $SetLookupRowsTable, SetLookupRow>
+    ),
+    SetLookupRow,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2809,4 +3250,6 @@ class $AppDatabaseManager {
   $$CollectionItemOverridesTableTableManager get collectionItemOverrides =>
       $$CollectionItemOverridesTableTableManager(
           _db, _db.collectionItemOverrides);
+  $$SetLookupRowsTableTableManager get setLookupRows =>
+      $$SetLookupRowsTableTableManager(_db, _db.setLookupRows);
 }
