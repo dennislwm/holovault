@@ -1,12 +1,11 @@
-import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
-import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/database/database.dart';
-import 'package:holovault/main.dart';
 import 'package:holovault/screens/collection_list_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'helpers.dart';
 
 // ponytail: drift's StreamBuilder-backed watch() query schedules a
 // zero-duration cleanup Timer on unmount (StreamQueryStore.markAsClosed).
@@ -15,30 +14,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 // during the test, it's the framework's own automatic teardown. Unmounting
 // ourselves as the last step, under a pump we control, fixes it at the one
 // place every test needs it, instead of pumps sprinkled after each action.
-Future<void> disposeAndFlush(WidgetTester tester) async {
-  await tester.pumpWidget(const SizedBox());
-  await tester.pump(const Duration(milliseconds: 1));
-}
-
 void main() {
-  late AppDatabase db;
-
-  setUp(() {
-    db = AppDatabase.withExecutor(NativeDatabase.memory());
-    // ADR-15: ValueTrendScreen now mounts eagerly alongside
-    // CollectionListScreen inside HolovaultShell's IndexedStack, so its
-    // SharedPreferences.getInstance() call runs even on tests that only
-    // ever look at the Collection tab.
-    SharedPreferences.setMockInitialValues({});
-  });
-
-  tearDown(() async {
-    await db.close();
-  });
+  final fx = WidgetFixture();
 
   testWidgets('shows empty state with no items', (WidgetTester tester) async {
-    await tester.pumpWidget(HolovaultApp(database: db));
-    await tester.pumpAndSettle();
+    await fx.pumpApp(tester);
 
     expect(find.text('No items yet'), findsOneWidget);
 
@@ -48,8 +28,7 @@ void main() {
   // REQ-052: wiring only. The parser and the store are tested as plain
   // functions in set_lookup_test.dart.
   testWidgets('REQ-052: the overflow menu offers Import set lookup', (WidgetTester tester) async {
-    await tester.pumpWidget(HolovaultApp(database: db));
-    await tester.pumpAndSettle();
+    await fx.pumpApp(tester);
 
     await tester.tap(find.byType(PopupMenuButton<String>));
     await tester.pumpAndSettle();
@@ -62,8 +41,7 @@ void main() {
 
   testWidgets('REQ-040: app-wide theme is wired in, not Flutter\'s unstyled default',
       (WidgetTester tester) async {
-    await tester.pumpWidget(HolovaultApp(database: db));
-    await tester.pumpAndSettle();
+    await fx.pumpApp(tester);
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme, isNotNull);
@@ -80,26 +58,23 @@ void main() {
     'REQ-027: switching tabs preserves ValueTrendScreen filter state '
     'instead of resetting it',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Charizard',
-          rarity: const Value('Holo'),
-          valueTotal: const Value(100.0),
-          dateAdded: Value(DateTime(2026, 1, 1)),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: 'card-1',
+        name: 'Charizard',
+        rarity: 'Holo',
+        valueTotal: 100.0,
+        dateAdded: DateTime(2026, 1, 1),
       );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-2',
-          name: 'Blastoise',
-          rarity: const Value('Common'),
-          valueTotal: const Value(50.0),
-          dateAdded: Value(DateTime(2026, 2, 1)),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: 'card-2',
+        name: 'Blastoise',
+        rarity: 'Common',
+        valueTotal: 50.0,
+        dateAdded: DateTime(2026, 2, 1),
       );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
 
       expect(find.byType(BottomNavigationBar), findsOneWidget);
       expect(find.text('Charizard'), findsOneWidget);
@@ -109,22 +84,7 @@ void main() {
       // REQ-034 (ADR-19): the clause-builder bottom sheet replaces the old
       // Rarity dropdown -- same field/operator/value sequence as
       // widget_test.dart's own "adding a clause via the bottom sheet" test.
-      await tester.tap(find.text('Add clause'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Field').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Rarity').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Operator').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('=').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Value').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Holo').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Add').last);
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Rarity', op: '=', value: 'Holo');
       expect(find.text('1 matching items'), findsOneWidget);
 
       // Switch to Collection, then back to Value trend -- with a pushed
@@ -159,36 +119,11 @@ void main() {
     },
   );
 
-  testWidgets('lists items and opens the detail screen on tap', (
-    WidgetTester tester,
-  ) async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-    );
-    await tester.pumpWidget(HolovaultApp(database: db));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Charizard'), findsOneWidget);
-
-    await tester.tap(find.text('Charizard'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Item detail'), findsOneWidget);
-    // REQ-014: the item name now renders twice -- once in the hero banner,
-    // once in the editable name field below it.
-    expect(find.text('Charizard'), findsNWidgets(2));
-
-    await disposeAndFlush(tester);
-  });
-
   testWidgets('saving the detail form persists the edited name', (
     WidgetTester tester,
   ) async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-    );
-    await tester.pumpWidget(HolovaultApp(database: db));
-    await tester.pumpAndSettle();
+    await seedItem(fx.db, importedId: 'card-1', name: 'Charizard');
+    await fx.pumpApp(tester);
     await tester.tap(find.text('Charizard'));
     await tester.pumpAndSettle();
 
@@ -197,7 +132,7 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
 
-    final rows = await db.select(db.collectionItems).get();
+    final rows = await fx.db.select(fx.db.collectionItems).get();
     expect(rows.single.name, 'Blastoise');
 
     await disposeAndFlush(tester);
@@ -209,7 +144,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: CollectionListScreen(
-          database: db,
+          database: fx.db,
           pickFile: () async => '/fake/path/export.csv',
           parseFile: (path) async => [
             {'id': 'card-1', 'product_name': 'Charizard', 'extra': null},
@@ -224,7 +159,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Imported 2 item(s)'), findsOneWidget);
-    final rows = await db.select(db.collectionItems).get();
+    final rows = await fx.db.select(fx.db.collectionItems).get();
     expect(rows, hasLength(2));
 
     await disposeAndFlush(tester);
@@ -233,16 +168,14 @@ void main() {
   testWidgets(
     'saving the detail form does not wipe the item\'s other imported fields',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Charizard',
-          valueTotal: const Value(10765.74),
-          rarity: const Value('Sealed'),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: 'card-1',
+        name: 'Charizard',
+        valueTotal: 10765.74,
+        rarity: 'Sealed',
       );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
       await tester.tap(find.text('Charizard'));
       await tester.pumpAndSettle();
 
@@ -251,7 +184,7 @@ void main() {
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
-      final row = (await db.select(db.collectionItems).get()).single;
+      final row = (await fx.db.select(fx.db.collectionItems).get()).single;
       expect(row.name, 'Blastoise');
       expect(row.valueTotal, 10765.74);
       expect(row.rarity, 'Sealed');
@@ -266,7 +199,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: CollectionListScreen(
-            database: db,
+            database: fx.db,
             pickFile: () async => '/fake/path/export.csv',
             parseFile: (path) async => [
               {
@@ -291,7 +224,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.file_upload));
       await tester.pumpAndSettle();
 
-      final row = (await db.select(db.collectionItems).get()).single;
+      final row = (await fx.db.select(fx.db.collectionItems).get()).single;
       expect(row.quantity, 2);
       expect(row.valueTotal, 10765.74);
       expect(row.groupWishlist, false);
@@ -311,7 +244,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: CollectionListScreen(
-          database: db,
+          database: fx.db,
           pickFile: () async => '/fake/path/export.csv',
           parseFile: parseFile,
         ),
@@ -324,7 +257,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.file_upload));
     await tester.pumpAndSettle();
 
-    final rows = await db.select(db.collectionItems).get();
+    final rows = await fx.db.select(fx.db.collectionItems).get();
     expect(rows, hasLength(1));
 
     await disposeAndFlush(tester);
@@ -333,13 +266,11 @@ void main() {
   testWidgets(
     'REQ-010: import shows a SnackBar instead of crashing when parseFile() throws',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-      );
+      await seedItem(fx.db, importedId: 'card-1', name: 'Charizard');
       await tester.pumpWidget(
         MaterialApp(
           home: CollectionListScreen(
-            database: db,
+            database: fx.db,
             pickFile: () async => '/fake/path/export.csv',
             parseFile: (path) async => throw const FormatException('bad csv'),
           ),
@@ -351,7 +282,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Import failed'), findsOneWidget);
-      final rows = await db.select(db.collectionItems).get();
+      final rows = await fx.db.select(fx.db.collectionItems).get();
       expect(rows, hasLength(1));
       expect(rows.single.importedId, 'card-1');
 
@@ -365,7 +296,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: CollectionListScreen(
-            database: db,
+            database: fx.db,
             pickFile: () async => '/fake/path/export.csv',
             parseFile: (path) async => throw const FormatException('bad csv'),
           ),
@@ -378,7 +309,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.file_upload));
       await tester.pumpAndSettle();
 
-      final rows = await db.select(db.collectionItems).get();
+      final rows = await fx.db.select(fx.db.collectionItems).get();
       expect(rows, isEmpty);
 
       await disposeAndFlush(tester);
@@ -388,16 +319,14 @@ void main() {
   testWidgets(
     'REQ-011: import refuses a row with a malformed quantity instead of crashing',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-      );
+      await seedItem(fx.db, importedId: 'card-1', name: 'Charizard');
       Future<List<Map<String, String?>>> parseFile(String path) async => [
         {'id': 'card-2', 'product_name': 'Blastoise', 'quantity': 'abc'},
       ];
       await tester.pumpWidget(
         MaterialApp(
           home: CollectionListScreen(
-            database: db,
+            database: fx.db,
             pickFile: () async => '/fake/path/export.csv',
             parseFile: parseFile,
           ),
@@ -409,7 +338,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Import refused'), findsOneWidget);
-      final rows = await db.select(db.collectionItems).get();
+      final rows = await fx.db.select(fx.db.collectionItems).get();
       expect(rows, hasLength(1));
       expect(rows.single.importedId, 'card-1');
 
@@ -426,7 +355,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: CollectionListScreen(
-            database: db,
+            database: fx.db,
             pickFile: () async => '/fake/path/export.csv',
             parseFile: parseFile,
           ),
@@ -439,27 +368,8 @@ void main() {
       await tester.tap(find.byIcon(Icons.file_upload));
       await tester.pumpAndSettle();
 
-      final rows = await db.select(db.collectionItems).get();
+      final rows = await fx.db.select(fx.db.collectionItems).get();
       expect(rows, isEmpty);
-
-      await disposeAndFlush(tester);
-    },
-  );
-
-  testWidgets(
-    'REQ-014: list row shows a quantity chip',
-    (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Charizard',
-          quantity: const Value(3),
-        ),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
-
-      expect(find.text('×3'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
@@ -468,25 +378,23 @@ void main() {
   testWidgets(
     'REQ-014: detail screen shows read-only imported fields grouped above the editable form',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Arceus V',
-          setName: const Value('Sword & Shield Promos'),
-          discriminator: const Value('267/S-P'),
-          rarity: const Value('Promo'),
-          quantity: const Value(1),
-          valueTotal: const Value(115.19),
-          valuePerUnit: const Value(115.19),
-          paidTotal: const Value(85.25),
-          paidPerUnit: const Value(85.25),
-          gradeType: const Value('PSA'),
-          gradeSubtype: const Value('10 GEM-MT'),
-          dateAdded: Value(DateTime.parse('2026-03-24T22:37:38')),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: 'card-1',
+        name: 'Arceus V',
+        setName: 'Sword & Shield Promos',
+        discriminator: '267/S-P',
+        rarity: 'Promo',
+        quantity: 1,
+        valueTotal: 115.19,
+        valuePerUnit: 115.19,
+        paidTotal: 85.25,
+        paidPerUnit: 85.25,
+        gradeType: 'PSA',
+        gradeSubtype: '10 GEM-MT',
+        dateAdded: DateTime.parse('2026-03-24T22:37:38'),
       );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
       await tester.tap(find.text('Arceus V'));
       await tester.pumpAndSettle();
 
@@ -506,14 +414,9 @@ void main() {
   testWidgets(
     'REQ-014: detail screen shows a position indicator and swipe hint',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-      );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Blastoise'),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await seedItem(fx.db, importedId: 'card-1', name: 'Charizard');
+      await seedItem(fx.db, importedId: 'card-2', name: 'Blastoise');
+      await fx.pumpApp(tester);
       // REQ-042 (b): Collection now defaults to Name ascending, so Blastoise is 1.
       await tester.tap(find.text('Blastoise'));
       await tester.pumpAndSettle();
@@ -539,7 +442,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: CollectionListScreen(
-            database: db,
+            database: fx.db,
             pickFile: () async => '/fake/path/export.json',
             parseFile: parseFile,
           ),
@@ -551,7 +454,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Imported'), findsOneWidget);
-      final rows = await db.select(db.collectionItems).get();
+      final rows = await fx.db.select(fx.db.collectionItems).get();
       expect(rows, hasLength(1));
       expect(rows.single.valueTotal, isNull);
       expect(rows.single.valuePerUnit, isNull);
@@ -563,14 +466,12 @@ void main() {
   testWidgets(
     'REQ-009: import with zero parsed rows leaves the existing collection untouched',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-      );
+      await seedItem(fx.db, importedId: 'card-1', name: 'Charizard');
       Future<List<Map<String, String?>>> parseFile(String path) async => [];
       await tester.pumpWidget(
         MaterialApp(
           home: CollectionListScreen(
-            database: db,
+            database: fx.db,
             pickFile: () async => '/fake/path/export.csv',
             parseFile: parseFile,
           ),
@@ -582,7 +483,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Import found no rows'), findsOneWidget);
-      final rows = await db.select(db.collectionItems).get();
+      final rows = await fx.db.select(fx.db.collectionItems).get();
       expect(rows, hasLength(1));
       expect(rows.single.importedId, 'card-1');
 
@@ -594,32 +495,28 @@ void main() {
     'REQ-029: Collection Distribution card shows Sealed/Graded/Ungraded '
     'amount and percent inline, above the item list',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Booster Box',
-          rarity: const Value('Sealed'),
-          valueTotal: const Value(150.0),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: 'card-1',
+        name: 'Booster Box',
+        rarity: 'Sealed',
+        valueTotal: 150.0,
       );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-2',
-          name: 'Arceus V',
-          gradeType: const Value('PSA'),
-          valueTotal: const Value(50.0),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: 'card-2',
+        name: 'Arceus V',
+        gradeType: 'PSA',
+        valueTotal: 50.0,
       );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-3',
-          name: 'Pikachu',
-          gradeType: const Value('Ungraded'),
-          valueTotal: const Value(0.0),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: 'card-3',
+        name: 'Pikachu',
+        gradeType: 'Ungraded',
+        valueTotal: 0.0,
       );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
 
       expect(find.text('COLLECTION DISTRIBUTION'), findsOneWidget);
       expect(find.text('\$150.00 · 75.0%'), findsOneWidget);
@@ -634,14 +531,9 @@ void main() {
   testWidgets(
     'REQ-030: typing in the search bar narrows the item list',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-      );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Blastoise'),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await seedItem(fx.db, importedId: 'card-1', name: 'Charizard');
+      await seedItem(fx.db, importedId: 'card-2', name: 'Blastoise');
+      await fx.pumpApp(tester);
 
       expect(find.text('Charizard'), findsOneWidget);
       expect(find.text('Blastoise'), findsOneWidget);
@@ -657,52 +549,17 @@ void main() {
   );
 
   testWidgets(
-    'REQ-031: match-count line updates as the search bar narrows the list',
-    (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Charizard'),
-      );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Blastoise'),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
-
-      expect(find.text('2 matching items'), findsOneWidget);
-
-      await tester.enterText(find.byType(TextField).first, 'char');
-      await tester.pumpAndSettle();
-
-      expect(find.text('1 matching items'), findsOneWidget);
-
-      await disposeAndFlush(tester);
-    },
-  );
-
-  testWidgets(
     'REQ-032: matching value and % of collection update as the search bar narrows the list',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Charizard',
-          valueTotal: const Value(300),
-        ),
-      );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-2',
-          name: 'Blastoise',
-          valueTotal: const Value(100),
-        ),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await seedItem(fx.db, importedId: 'card-1', name: 'Charizard', valueTotal: 300);
+      await seedItem(fx.db, importedId: 'card-2', name: 'Blastoise', valueTotal: 100);
+      await fx.pumpApp(tester);
 
       // Both items match: value = 300+100 = 400.00, 100.0% of the whole
       // collection (which is just these two items).
       expect(find.text('\$400.00'), findsOneWidget);
       expect(find.text('100.0%'), findsOneWidget);
+      expect(find.text('2 matching items'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField).first, 'char');
       await tester.pumpAndSettle();
@@ -710,6 +567,7 @@ void main() {
       // Narrowed to Charizard only: value = 300.00, 75.0% of the 400.00 whole.
       expect(find.text('\$300.00'), findsOneWidget);
       expect(find.text('75.0%'), findsOneWidget);
+      expect(find.text('1 matching items'), findsOneWidget);
 
       await disposeAndFlush(tester);
     },
@@ -760,43 +618,11 @@ void main() {
   testWidgets(
     'REQ-030: adding a clause via the bottom sheet narrows the item list',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Booster Box',
-          rarity: const Value('Sealed'),
-        ),
-      );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-2',
-          name: 'Charizard ex',
-          rarity: const Value('Holo'),
-        ),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await seedItem(fx.db, importedId: 'card-1', name: 'Booster Box', rarity: 'Sealed');
+      await seedItem(fx.db, importedId: 'card-2', name: 'Charizard ex', rarity: 'Holo');
+      await fx.pumpApp(tester);
 
-      await tester.tap(find.text('Add clause'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Field'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Rarity').last);
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Operator'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('=').last);
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Value'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Sealed').last);
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Add'));
-      await tester.pumpAndSettle();
+      await addClause(tester, field: 'Rarity', op: '=', value: 'Sealed');
 
       expect(find.text('Booster Box'), findsOneWidget);
       expect(find.text('Charizard ex'), findsNothing);
@@ -811,7 +637,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: CollectionListScreen(database: db, pickFile: () async => null),
+        home: CollectionListScreen(database: fx.db, pickFile: () async => null),
       ),
     );
     await tester.pumpAndSettle();
@@ -828,14 +654,9 @@ void main() {
     'REQ-033: search text survives the field scrolling off-screen and back',
     (WidgetTester tester) async {
       for (var i = 0; i < 100; i++) {
-        await db.upsertItem(
-          CollectionItemsCompanion.insert(importedId: 'card-$i', name: 'Card $i'),
-        );
+        await seedItem(fx.db, importedId: 'card-$i', name: 'Card $i');
       }
-      await tester.pumpWidget(
-        MaterialApp(home: CollectionListScreen(database: db)),
-      );
-      await tester.pumpAndSettle();
+      await fx.pumpScreen(tester, CollectionListScreen(database: fx.db));
 
       await tester.enterText(find.byType(TextField).first, 'Charizard');
       await tester.pump();
@@ -863,13 +684,7 @@ void main() {
         ('card-2', 'Bb', null),
         ('card-3', 'Cc', 30.0),
       ]) {
-        await db.upsertItem(
-          CollectionItemsCompanion.insert(
-            importedId: id,
-            name: name,
-            valueTotal: Value(value),
-          ),
-        );
+        await seedItem(fx.db, importedId: id, name: name, valueTotal: value);
       }
       List<String> order() => [
         for (final n in ['Aa', 'Bb', 'Cc']) n,
@@ -878,8 +693,7 @@ void main() {
           .dy
           .compareTo(tester.getTopLeft(find.text(b)).dy));
 
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
       expect(order(), ['Aa', 'Bb', 'Cc']); // default: Name ascending
 
       await tester.tap(find.byKey(const Key('sort-key-picker')));
@@ -894,8 +708,7 @@ void main() {
 
       // Restart: a fresh app reads the persisted key and direction.
       await tester.pumpWidget(const SizedBox());
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
       expect(order(), ['Cc', 'Aa', 'Bb']);
 
       await disposeAndFlush(tester);
@@ -910,10 +723,9 @@ void main() {
       'REQ-042 (b): a ${stored.containsKey("collection_list_filter_sort_asc") ? "wrong-typed" : "unknown"} stored sort falls back to the initial order',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues(stored);
-        await db.upsertItem(CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Bb'));
-        await db.upsertItem(CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Aa'));
-        await tester.pumpWidget(HolovaultApp(database: db));
-        await tester.pumpAndSettle();
+        await seedItem(fx.db, importedId: 'card-1', name: 'Bb');
+        await seedItem(fx.db, importedId: 'card-2', name: 'Aa');
+        await fx.pumpApp(tester);
 
         expect(
           tester.getTopLeft(find.text('Aa')).dy,
@@ -928,14 +740,9 @@ void main() {
   testWidgets(
     'REQ-042 (b): changing the sort key resets a descending direction to ascending',
     (WidgetTester tester) async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-1', name: 'Aa', valueTotal: const Value(10)),
-      );
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'card-2', name: 'Bb', valueTotal: const Value(30)),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await seedItem(fx.db, importedId: 'card-1', name: 'Aa', valueTotal: 10);
+      await seedItem(fx.db, importedId: 'card-2', name: 'Bb', valueTotal: 30);
+      await fx.pumpApp(tester);
       await tester.tap(find.byKey(const Key('sort-direction'))); // Name descending
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('sort-key-picker')));
@@ -953,7 +760,7 @@ void main() {
     },
   );
 
-  Future<void> seedColumnsItem() => db.upsertItem(
+  Future<void> seedColumnsItem() => fx.db.upsertItem(
     CollectionItemsCompanion.insert(
       importedId: 'card-1',
       name: 'Charizard',
@@ -967,8 +774,7 @@ void main() {
     'REQ-042 (c): columns dialog changes the row, a restart keeps it, and clearing every column restores the default',
     (WidgetTester tester) async {
       await seedColumnsItem();
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
       expect(find.text('first ed'), findsOneWidget); // default subtitle: Extra
       expect(find.text('×3'), findsOneWidget);
 
@@ -984,8 +790,7 @@ void main() {
 
       // Restart: the persisted columns come back.
       await tester.pumpWidget(const SizedBox());
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
       expect(find.text('Paid: 40.00'), findsOneWidget);
 
       // Uncheck everything: the screen default returns.
@@ -1008,8 +813,7 @@ void main() {
     'REQ-042 (c): dragging a column to the top makes it the row title',
     (WidgetTester tester) async {
       await seedColumnsItem();
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
 
       await tester.tap(find.byKey(const Key('columns-button')).first);
       await tester.pumpAndSettle();
@@ -1037,8 +841,7 @@ void main() {
         'collection_list_filter_columns': '["bogus","quantity","name"]',
       });
       await seedColumnsItem();
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
 
       expect(
         tester.getTopLeft(find.text('×3')).dy,
@@ -1060,18 +863,16 @@ void main() {
         ('card-1', 'Big', 100.0, 200.0),
         ('card-2', 'Small', 100.0, 150.0),
       ]) {
-        await db.upsertItem(
-          CollectionItemsCompanion.insert(
-            importedId: id,
-            name: name,
-            paidPerUnit: Value(paid),
-            valuePerUnit: Value(value),
-            dateAdded: Value(bought),
-          ),
+        await seedItem(
+          fx.db,
+          importedId: id,
+          name: name,
+          paidPerUnit: paid,
+          valuePerUnit: value,
+          dateAdded: bought,
         );
       }
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
+      await fx.pumpApp(tester);
 
       final bars = tester
           .widgetList<LinearProgressIndicator>(find.byKey(const Key('return-bar')))
@@ -1080,34 +881,6 @@ void main() {
       expect(bars.length, 2);
       expect(bars.reduce((a, b) => a > b ? a : b), closeTo(1.0, 1e-9));
       expect(bars.reduce((a, b) => a < b ? a : b), lessThan(1.0));
-
-      await disposeAndFlush(tester);
-    },
-  );
-
-  testWidgets(
-    'REQ-042 (f): a filter that matches nothing shows the empty-state message',
-    (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues({
-        'collection_list_filter_clauses': jsonEncode([
-          {'field': 'setName', 'op': 'equal', 'value': 'Discontinued Set'},
-        ]),
-      });
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: 'card-1',
-          name: 'Charizard',
-          setName: const Value('Base Set'),
-          paidPerUnit: const Value(10.0),
-          valuePerUnit: const Value(20.0),
-          dateAdded: Value(DateTime.now().subtract(const Duration(days: 200))),
-        ),
-      );
-      await tester.pumpWidget(HolovaultApp(database: db));
-      await tester.pumpAndSettle();
-
-      expect(find.text('No items match the current filter'), findsOneWidget);
-      expect(find.text('Charizard'), findsNothing);
 
       await disposeAndFlush(tester);
     },

@@ -10,6 +10,7 @@ First run on a fresh checkout: [Maintainer setup](#maintainer-setup) (`flutter c
 1. **`make setup`** -- `flutter pub get`. Nothing else runs without this.
 2. **`make analyze`** -- static checks/lints. Run before `test` to catch cheap errors first.
 3. **`make test`** -- run the test suite.
+   - `make coverage` runs the same suite with branch coverage and writes `coverage/lcov.info`.
 4. **`make run`** -- launch the app.
    - Requires a booted iOS simulator or connected device.
    - No simulator booted yet? Run `make boot-sim`.

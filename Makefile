@@ -1,4 +1,4 @@
-.PHONY: help setup status test run run-release build-ios analyze check-pins clean boot-sim gen-overrides devices
+.PHONY: help setup status test coverage run run-release build-ios analyze check-pins clean boot-sim gen-overrides devices
 
 DEVICE ?= iPhone 16
 
@@ -16,6 +16,8 @@ help:
 	@echo "  status        Check flutter/xcode toolchain"
 	@echo "  test          Run flutter test suite"
 	@echo "                Requires: setup"
+	@echo "  coverage      Run flutter test with branch coverage"
+	@echo "                COV_OUT: lcov output path, default coverage/lcov.info"
 	@echo "  run           flutter run (iOS simulator/device by default)"
 	@echo "                DEVICE: a device name or id from 'make devices', e.g. DEVICE=\"My iPhone\""
 	@echo "                Requires: setup"
@@ -56,6 +58,10 @@ status:
 
 test:
 	flutter test $(ARGS)
+
+COV_OUT ?= coverage/lcov.info
+coverage:
+	flutter test --branch-coverage --coverage-path=$(COV_OUT) $(ARGS)
 
 run:
 	flutter run $(RUN_DEVICE)

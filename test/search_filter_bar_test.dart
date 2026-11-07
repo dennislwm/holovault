@@ -7,10 +7,7 @@ import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/widgets/search_filter_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<void> disposeAndFlush(WidgetTester tester) async {
-  await tester.pumpWidget(const SizedBox());
-  await tester.pump(const Duration(milliseconds: 1));
-}
+import 'helpers.dart';
 
 void main() {
   setUp(() {

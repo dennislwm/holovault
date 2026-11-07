@@ -9,6 +9,8 @@ import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/set_lookup.dart';
 import 'package:holovault/set_lookup_file.dart';
 
+import 'helpers.dart';
+
 // REQ-052 (ADR-24 Option 3). Rows shaped like data/set_language.json.
 Map<String, Object?> _alias(String name, {String app = 'shiny', Object? by = 'exact'}) => {
       'app': app,
@@ -130,7 +132,7 @@ void main() {
     test('collection import and the overrides path never write the lookup', () async {
       await importSetLookupText(db, good);
       final before = await snapshot();
-      await db.upsertItem(CollectionItemsCompanion.insert(importedId: 'c1', name: 'X'));
+      await seedItem(db, importedId: 'c1', name: 'X');
       await db.saveCustomFields('c1', {'serialNo': 'S1'});
       expect(await snapshot(), before);
     });

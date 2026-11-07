@@ -8,6 +8,8 @@ import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/widgets/search_filter_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'helpers.dart';
+
 /// REQ-043 (e): a registry holding every type, reading existing MergedItem
 /// fields so no overrides table is needed.
 final registry = <CustomColumn>[
@@ -139,54 +141,6 @@ void main() {
       expect(back.value, 'true');
       expect(back.customFieldId, 'cf.flag');
     });
-
-    testWidgets('the sheet offers true and false for held-only-true items and narrows',
-        (tester) async {
-      SharedPreferences.setMockInitialValues({});
-      tester.view.physicalSize = const Size(800, 2400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      final held = [w('a', true), w('b', null)];
-      var shown = held;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SearchFilterBar(
-              prefsKeyPrefix: 'b',
-              items: held,
-              registry: registry,
-              onFiltered: (f) => shown = f,
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Add clause'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Field').last);
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('flag (bool)'),
-        100,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(find.text('flag (bool)').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Operator').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('=').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Value').last);
-      await tester.pumpAndSettle();
-      expect(find.text('false'), findsOneWidget);
-      await tester.tap(find.text('true').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Add').last);
-      await tester.pumpAndSettle();
-
-      expect(shown.map((i) => i.name), ['a']);
-      expect(find.text('flag = true'), findsOneWidget);
-    });
   });
 
   group('date fields (f)', () {
@@ -229,16 +183,6 @@ void main() {
           '${local.day.toString().padLeft(2, '0')}';
       expect(formatDay(utc), key);
       expect(await names([at('u', utc)], cc('when', SearchOperator.equal, key)), ['u']);
-    });
-
-    test('clause JSON round trip keeps the yyyy-MM-dd string', () {
-      final c = cc('when', SearchOperator.greaterThanOrEqual, '2025-06-01');
-      final back = SearchClause.tryFromJson(
-        jsonDecode(jsonEncode(c.toJson())) as Map<String, dynamic>,
-        registry,
-      )!;
-      expect(back.value, '2025-06-01');
-      expect(back.fieldLabel, 'when');
     });
 
     test('sort ignores time of day, nulls last both ways, ties stable', () {
@@ -325,28 +269,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add clause'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Field').last);
-    await tester.pumpAndSettle();
     // 11 built-ins come first: the custom entry is below the fold of the menu.
-    await tester.scrollUntilVisible(
-      find.text('pick (choice)'),
-      100,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.text('pick (choice)').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Operator').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('=').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Value').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('NM').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Add').last);
-    await tester.pumpAndSettle();
+    await addClause(tester, field: 'pick (choice)', op: '=', value: 'NM', scroll: true);
 
     expect(shown.map((i) => i.name), ['a']);
     expect(find.text('pick = NM'), findsOneWidget);

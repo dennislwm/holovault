@@ -1,29 +1,18 @@
 import 'package:drift/drift.dart' show Value;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/annualized_return.dart';
 import 'package:holovault/collection_search.dart';
 import 'package:holovault/database/database.dart';
 
+import 'helpers.dart';
+
 void main() {
-  late AppDatabase db;
-
-  setUp(() {
-    db = AppDatabase.withExecutor(NativeDatabase.memory());
-  });
-
-  tearDown(() async {
-    await db.close();
-  });
+  final fx = DbFixture();
 
   test('REQ-030: a numeric clause (value>100) narrows the list', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '1', name: 'A', valueTotal: const Value(50)),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '2', name: 'B', valueTotal: const Value(150)),
-    );
-    final items = await db.select(db.mergedItems).get();
+    await seedItem(fx.db, importedId: '1', name: 'A', valueTotal: 50);
+    await seedItem(fx.db, importedId: '2', name: 'B', valueTotal: 150);
+    final items = await fx.db.select(fx.db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -37,13 +26,9 @@ void main() {
   });
 
   test('REQ-030: a text clause (rarity!=Sealed) excludes matching items', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '1', name: 'A', rarity: const Value('Sealed')),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '2', name: 'B', rarity: const Value('Holo')),
-    );
-    final items = await db.select(db.mergedItems).get();
+    await seedItem(fx.db, importedId: '1', name: 'A', rarity: 'Sealed');
+    await seedItem(fx.db, importedId: '2', name: 'B', rarity: 'Holo');
+    final items = await fx.db.select(fx.db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -57,11 +42,9 @@ void main() {
   });
 
   test('REQ-030: an item with a null field never matches any clause on that field', () async {
-    await db.upsertItem(CollectionItemsCompanion.insert(importedId: '1', name: 'A'));
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '2', name: 'B', valueTotal: const Value(100)),
-    );
-    final items = await db.select(db.mergedItems).get();
+    await seedItem(fx.db, importedId: '1', name: 'A');
+    await seedItem(fx.db, importedId: '2', name: 'B', valueTotal: 100);
+    final items = await fx.db.select(fx.db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -77,28 +60,10 @@ void main() {
   });
 
   test('REQ-030: search text and a clause narrow together (AND)', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '1',
-        name: 'Charizard',
-        rarity: const Value('Sealed'),
-      ),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '2',
-        name: 'Charizard',
-        rarity: const Value('Holo'),
-      ),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '3',
-        name: 'Blastoise',
-        rarity: const Value('Sealed'),
-      ),
-    );
-    final items = await db.select(db.mergedItems).get();
+    await seedItem(fx.db, importedId: '1', name: 'Charizard', rarity: 'Sealed');
+    await seedItem(fx.db, importedId: '2', name: 'Charizard', rarity: 'Holo');
+    await seedItem(fx.db, importedId: '3', name: 'Blastoise', rarity: 'Sealed');
+    final items = await fx.db.select(fx.db.mergedItems).get();
 
     final result = await filterCollectionItems(
       items,
@@ -112,77 +77,54 @@ void main() {
     expect(result.single.rarity, 'Sealed');
   });
 
-  test('REQ-035: a paidPerUnit clause compares per-unit, not the paidTotal', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '1',
-        name: 'Cheap per unit, high total',
-        paidPerUnit: const Value(5),
-        paidTotal: const Value(500),
+  // REQ-035 (paid) and REQ-036 (value): a per-unit field compares the per-unit
+  // column, not the total column.
+  for (final (label, field, make) in <(
+    String,
+    SearchField,
+    CollectionItemsCompanion Function(String, String, double, double),
+  )>[
+    (
+      'REQ-035: a paidPerUnit clause compares per-unit, not the paidTotal',
+      SearchField.paidPerUnit,
+      (id, name, unit, total) => CollectionItemsCompanion.insert(
+        importedId: id,
+        name: name,
+        paidPerUnit: Value(unit),
+        paidTotal: Value(total),
       ),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '2',
-        name: 'Pricey per unit',
-        paidPerUnit: const Value(50),
-        paidTotal: const Value(50),
+    ),
+    (
+      'REQ-036: a valuePerUnit clause compares per-unit, not the valueTotal',
+      SearchField.valuePerUnit,
+      (id, name, unit, total) => CollectionItemsCompanion.insert(
+        importedId: id,
+        name: name,
+        valuePerUnit: Value(unit),
+        valueTotal: Value(total),
       ),
-    );
-    final items = await db.select(db.mergedItems).get();
+    ),
+  ]) {
+    test(label, () async {
+      await fx.db.upsertItem(make('1', 'Cheap per unit, high total', 5, 500));
+      await fx.db.upsertItem(make('2', 'Pricey per unit', 50, 50));
+      final items = await fx.db.select(fx.db.mergedItems).get();
 
-    final result = await filterCollectionItems(
-      items,
-      searchTerm: '',
-      clauses: const [
-        SearchClause(field: SearchField.paidPerUnit, op: SearchOperator.greaterThan, value: '10'),
-      ],
-    );
+      final result = await filterCollectionItems(
+        items,
+        searchTerm: '',
+        clauses: [SearchClause(field: field, op: SearchOperator.greaterThan, value: '10')],
+      );
 
-    expect(result.map((i) => i.name), ['Pricey per unit']);
-  });
-
-  test('REQ-036: a valuePerUnit clause compares per-unit, not the valueTotal', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '1',
-        name: 'Cheap per unit, high total',
-        valuePerUnit: const Value(5),
-        valueTotal: const Value(500),
-      ),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '2',
-        name: 'Pricey per unit',
-        valuePerUnit: const Value(50),
-        valueTotal: const Value(50),
-      ),
-    );
-    final items = await db.select(db.mergedItems).get();
-
-    final result = await filterCollectionItems(
-      items,
-      searchTerm: '',
-      clauses: const [
-        SearchClause(field: SearchField.valuePerUnit, op: SearchOperator.greaterThan, value: '10'),
-      ],
-    );
-
-    expect(result.map((i) => i.name), ['Pricey per unit']);
-  });
+      expect(result.map((i) => i.name), ['Pricey per unit']);
+    });
+  }
 
   test('REQ-030: distinctValuesForId returns sorted, deduplicated real values', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '1', name: 'A', rarity: const Value('Sealed')),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '2', name: 'B', rarity: const Value('Holo')),
-    );
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(importedId: '3', name: 'C', rarity: const Value('Holo')),
-    );
-    final items = await db.select(db.mergedItems).get();
+    await seedItem(fx.db, importedId: '1', name: 'A', rarity: 'Sealed');
+    await seedItem(fx.db, importedId: '2', name: 'B', rarity: 'Holo');
+    await seedItem(fx.db, importedId: '3', name: 'C', rarity: 'Holo');
+    final items = await fx.db.select(fx.db.mergedItems).get();
 
     expect(distinctValuesForId(SearchField.rarity.name, items), ['Holo', 'Sealed']);
   });
@@ -284,14 +226,10 @@ void main() {
 
   group('REQ-042 (b): sortItems', () {
     Future<List<MergedItem>> seed() async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: '1', name: 'b', valueTotal: const Value(20)),
-      );
-      await db.upsertItem(CollectionItemsCompanion.insert(importedId: '2', name: 'A'));
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: '3', name: 'C', valueTotal: const Value(10)),
-      );
-      return db.select(db.mergedItems).get();
+      await seedItem(fx.db, importedId: '1', name: 'b', valueTotal: 20);
+      await seedItem(fx.db, importedId: '2', name: 'A');
+      await seedItem(fx.db, importedId: '3', name: 'C', valueTotal: 10);
+      return fx.db.select(fx.db.mergedItems).get();
     }
 
     test('an item with no value sorts last in both directions', () async {
@@ -341,17 +279,16 @@ void main() {
       ('2', 100.0, 40.0),
       ('3', 100.0, null),
     ]) {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(
-          importedId: id,
-          name: id,
-          paidPerUnit: Value(paid),
-          valuePerUnit: Value(value),
-          dateAdded: Value(bought),
-        ),
+      await seedItem(
+        fx.db,
+        importedId: id,
+        name: id,
+        paidPerUnit: paid,
+        valuePerUnit: value,
+        dateAdded: bought,
       );
     }
-    final items = await db.watchMergedItems().first;
+    final items = await fx.db.watchMergedItems().first;
     expect(maxAbsReturnAnnual([items.last], now: now), 0);
     final byId = {for (final i in items) i.importedId: i};
     final up = annualizedReturnPercent(byId['1']!, now)!;
@@ -361,16 +298,8 @@ void main() {
   });
 
   test('REQ-042 (c): cellText formats each field kind and reports a missing value as null', () async {
-    await db.upsertItem(
-      CollectionItemsCompanion.insert(
-        importedId: '1',
-        name: 'A',
-        quantity: const Value(3),
-        paidTotal: const Value(12.5),
-        rarity: const Value('Holo'),
-      ),
-    );
-    final item = (await db.watchMergedItems().first).single;
+    await seedItem(fx.db, importedId: '1', name: 'A', quantity: 3, paidTotal: 12.5, rarity: 'Holo');
+    final item = (await fx.db.watchMergedItems().first).single;
     expect(cellText(item, 'name'), 'A');
     expect(cellText(item, 'extra'), isNull);
     expect(cellText(item, 'quantity'), '×3');

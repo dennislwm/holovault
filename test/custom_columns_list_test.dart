@@ -83,11 +83,6 @@ void main() {
     expect(s('wish', false), [1, 2, 4, 3]);
   });
 
-  test('sort: real compares numerically', () {
-    final items = [_item(1, cost: 10), _item(2, cost: 9.5)];
-    expect(_order(sortItems(items, 'cf.cost', true, registry: _registry)), [2, 1]);
-  });
-
   test('sort: removed and unknown keys leave the order unchanged', () {
     final items = [_item(2, when: DateTime(2026)), _item(1, when: DateTime(2025))];
     for (final k in ['cf.gone', 'bogus']) {

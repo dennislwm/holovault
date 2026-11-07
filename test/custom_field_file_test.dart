@@ -9,6 +9,8 @@ import 'package:holovault/database/database.dart';
 import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/screens/collection_list_screen.dart';
 
+import 'helpers.dart';
+
 // REQ-047: a registry holding all six types (the real one has no int or bool).
 // Callbacks are never called by the pure builder or parser.
 final _all = <CustomColumn>[
@@ -157,7 +159,7 @@ void main() {
     setUp(() async {
       dir = Directory.systemTemp.createTempSync('holovault_cff_');
       db = AppDatabase.withExecutor(NativeDatabase(File('${dir.path}/t.sqlite')));
-      await db.upsertItem(CollectionItemsCompanion.insert(importedId: 'c1', name: 'Charizard'));
+      await seedItem(db, importedId: 'c1', name: 'Charizard');
     });
 
     tearDown(() async {

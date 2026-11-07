@@ -10,6 +10,8 @@ import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/screens/custom_fields_section.dart';
 import 'package:holovault/screens/item_detail_screen.dart';
 
+import 'helpers.dart';
+
 CustomColumn _col(String name) =>
     customColumns.firstWhere((c) => c.name == name);
 
@@ -92,9 +94,7 @@ void main() {
     setUp(() async {
       dir = Directory.systemTemp.createTempSync('holovault_cf_');
       db = AppDatabase.withExecutor(NativeDatabase(File('${dir.path}/t.sqlite')));
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'c1', name: 'Charizard'),
-      );
+      await seedItem(db, importedId: 'c1', name: 'Charizard');
     });
 
     tearDown(() async {
@@ -206,9 +206,7 @@ void main() {
     });
 
     test('REQ-043 c: merged stream carries custom values, null without overrides, omits hidden rows', () async {
-      await db.upsertItem(
-        CollectionItemsCompanion.insert(importedId: 'c2', name: 'Blastoise'),
-      );
+      await seedItem(db, importedId: 'c2', name: 'Blastoise');
       await db.saveCustomFields('c1', {'serialNo': 'X1'});
       await db.saveCustomFields('gone', {'serialNo': 'H1'});
 
