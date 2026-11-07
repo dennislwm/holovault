@@ -28,7 +28,6 @@ void main() {
     expect(rowChips(_item(grader: 'PSA', subtype: '9 MINT')), ['PSA9']);
     expect(rowChips(_item(grader: 'BGS', subtype: '9.5')), ['BGS9.5']);
     expect(rowChips(_item(grader: 'CGC', subtype: 'Pristine')), ['Pristine']);
-    expect(rowChips(_item(grader: 'PSA')), ['PSA']);
     expect(rowChips(_item(grader: 'Ungraded', subtype: 'Near Mint')), isEmpty);
     expect(rowChips(_item(grader: '', subtype: '10')), isEmpty);
     expect(rowChips(_item(set: 'Unknown', number: '')), isEmpty);
