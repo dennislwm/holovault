@@ -55,9 +55,28 @@ class ItemRow extends StatelessWidget {
     );
   }
 
+  // REQ-054: a small outlined pill, like the mock's language chip.
+  Widget _chip(BuildContext context, String text) {
+    final color = Theme.of(context).colorScheme.primary;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final small = Theme.of(context).textTheme.bodySmall;
+    final hasSubtitle = columns.length > 1 &&
+        (columns[1] == SearchField.returnAnnual.name ||
+            cellText(item, columns[1], registry: registry) != null);
+    final chips = rowChips(item);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
@@ -67,10 +86,16 @@ class ItemRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _cell(context, columns.first, trailing: false),
-                if (columns.length > 1 &&
-                    (columns[1] == SearchField.returnAnnual.name ||
-                        cellText(item, columns[1], registry: registry) != null))
-                  _cell(context, columns[1], trailing: false, style: small),
+                // REQ-054: the chips sit on the subtitle line, as the ADR-24 mock shows.
+                if (hasSubtitle || chips.isNotEmpty)
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    children: [
+                      if (hasSubtitle) _cell(context, columns[1], trailing: false, style: small),
+                      for (final c in chips) _chip(context, c),
+                    ],
+                  ),
               ],
             ),
           ),

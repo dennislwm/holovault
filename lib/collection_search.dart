@@ -473,6 +473,29 @@ String? cellText(MergedItem item, String id, {DateTime? now, List<CustomColumn>?
   };
 }
 
+/// REQ-054: the small chips a row shows, in order: language (from the set
+/// lookup), grade, discriminator. A chip with no value is omitted. Grade is
+/// the grader plus the subtype's leading number, no space (`PSA10`); a
+/// subtype with no leading number shows as written, and an empty subtype
+/// shows the grader alone. Ungraded and empty grade types show no chip.
+List<String> rowChips(MergedItem item) {
+  String? clean(String? s) => (s == null || s.trim().isEmpty) ? null : s.trim();
+  final grader = clean(item.gradeType);
+  final subtype = clean(item.gradeSubtype);
+  String? grade;
+  if (grader != null && grader.toLowerCase() != 'ungraded') {
+    final n = subtype == null ? null : RegExp(r'^\d+(\.\d+)?').stringMatch(subtype);
+    grade = n != null ? '$grader$n' : (subtype ?? grader);
+  }
+  final language = clean(cellText(item, customId('language')));
+  final number = clean(item.discriminator);
+  return [
+    if (language != null) language,
+    if (grade != null) grade,
+    if (number != null) number,
+  ];
+}
+
 /// REQ-042 (c): the largest absolute annual return over [items], the
 /// denominator for the row's return bar. 0 when none has a return.
 double maxAbsReturnAnnual(List<MergedItem> items, {DateTime? now}) {

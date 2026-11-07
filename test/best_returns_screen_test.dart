@@ -37,7 +37,7 @@ void main() {
     await refreshSetLookup(fx.db);
     await tester.pumpAndSettle();
 
-    expect(find.text('ja'), findsOneWidget);
+    expect(find.text('ja'), findsWidgets); // the column cell and, REQ-054, the chip
 
     await disposeAndFlush(tester);
   });
