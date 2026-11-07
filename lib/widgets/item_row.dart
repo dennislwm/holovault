@@ -55,17 +55,27 @@ class ItemRow extends StatelessWidget {
     );
   }
 
-  // REQ-054: a small outlined pill, like the mock's language chip.
+  // REQ-054: a small filled pill in a monospace face, like the mock's language
+  // chip. The mock's 8px size is a scaled layout reference, so labelSmall stays.
   Widget _chip(BuildContext context, String text) {
     final color = Theme.of(context).colorScheme.primary;
     return DecoratedBox(
       decoration: BoxDecoration(
+        color: color.withAlpha(30),
         border: Border.all(color: color),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        child: Text(text, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color)),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontFamily: 'Menlo',
+                fontFamilyFallback: const ['monospace', 'Courier'],
+                fontWeight: FontWeight.w600,
+              ),
+        ),
       ),
     );
   }

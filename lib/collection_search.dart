@@ -483,7 +483,7 @@ List<String> rowChips(MergedItem item) {
   final grader = clean(item.gradeType);
   final subtype = clean(item.gradeSubtype);
   String? grade;
-  if (grader != null && grader.toLowerCase() != 'ungraded') {
+  if (grader != null && grader != 'Ungraded') {
     final n = subtype == null ? null : RegExp(r'^\d+(\.\d+)?').stringMatch(subtype);
     grade = n != null ? '$grader$n' : (subtype ?? grader);
   }
