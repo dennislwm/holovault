@@ -22,18 +22,17 @@ Future<void> refreshSetLookup(AppDatabase db) async {
   setLookupVersion.value++;
 }
 
-CustomColumn _derived(String name, String? Function(SetLookupRow) pick) =>
-    CustomColumn(
-      name,
-      CustomColumnType.text,
-      (r) {
+CustomColumn _derived(String name, String? Function(SetLookupRow) pick) => (
+      name: name,
+      type: CustomColumnType.text,
+      value: (r) {
         final set = r.setName;
         final row = set == null ? null : setLookup[set];
         return row == null ? null : pick(row);
       },
       // ponytail: a derived column has no overrides-table column; nothing on
       // the storage side is ever given this entry, so this is never called.
-      (_) => throw UnsupportedError('derived column $name has no overrides column'),
+      column: (_) => throw UnsupportedError('derived column $name has no overrides column'),
     );
 
 /// Fields the lookup adds to every row: blank where the row's set name has no

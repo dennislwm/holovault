@@ -5,17 +5,7 @@ import 'database/database.dart';
 /// ADR-16, Option 1: one item's CAGR result. Kept in its own pure-Dart
 /// file, separate from the screen widget, so the formula is
 /// unit-testable without a widget pump.
-class AnnualizedReturn {
-  const AnnualizedReturn({
-    required this.item,
-    required this.daysHeld,
-    required this.percent,
-  });
-
-  final MergedItem item;
-  final int daysHeld;
-  final double percent;
-}
+typedef AnnualizedReturn = ({MergedItem item, int daysHeld, double percent});
 
 /// REQ-041: one item's CAGR percent, or null when any input is missing or
 /// unusable (null/non-positive paid, null value, null dateAdded, days <= 0).
@@ -66,7 +56,7 @@ List<AnnualizedReturn> computeAnnualizedReturns(
     if (percent == null) continue;
     // dateAdded is non-null here: annualizedReturnPercent returns null without it.
     final days = today.difference(item.dateAdded!).inDays;
-    results.add(AnnualizedReturn(item: item, daysHeld: days, percent: percent));
+    results.add((item: item, daysHeld: days, percent: percent));
   }
   results.sort((a, b) => b.percent.compareTo(a.percent));
   return results.take(limit).toList();

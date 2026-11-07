@@ -64,19 +64,13 @@ abstract class MergedItems extends View {
 // overrides-table column (migration, choice suggestion query).
 enum CustomColumnType { text, bool, int, real, choice, date }
 
-class CustomColumn {
-  final String name;
-  final CustomColumnType type;
-  final Object? Function(MergedItem) value;
-  final GeneratedColumn Function($CollectionItemOverridesTable) column;
-  CustomColumn(this.name, this.type, this.value, this.column);
-}
+typedef CustomColumn = ({String name, CustomColumnType type, Object? Function(MergedItem) value, GeneratedColumn Function($CollectionItemOverridesTable) column});
 
 final customColumns = <CustomColumn>[
-  CustomColumn('serialNo', CustomColumnType.text, (r) => r.serialNo, (t) => t.serialNo),
-  CustomColumn('preGrade', CustomColumnType.choice, (r) => r.preGrade, (t) => t.preGrade),
-  CustomColumn('addCost', CustomColumnType.real, (r) => r.addCost, (t) => t.addCost),
-  CustomColumn('releasePrice', CustomColumnType.real, (r) => r.releasePrice, (t) => t.releasePrice),
-  CustomColumn('eventDate', CustomColumnType.date, (r) => r.eventDate, (t) => t.eventDate),
-  CustomColumn('eventName', CustomColumnType.choice, (r) => r.eventName, (t) => t.eventName),
+  (name: 'serialNo', type: CustomColumnType.text, value: (r) => r.serialNo, column: (t) => t.serialNo),
+  (name: 'preGrade', type: CustomColumnType.choice, value: (r) => r.preGrade, column: (t) => t.preGrade),
+  (name: 'addCost', type: CustomColumnType.real, value: (r) => r.addCost, column: (t) => t.addCost),
+  (name: 'releasePrice', type: CustomColumnType.real, value: (r) => r.releasePrice, column: (t) => t.releasePrice),
+  (name: 'eventDate', type: CustomColumnType.date, value: (r) => r.eventDate, column: (t) => t.eventDate),
+  (name: 'eventName', type: CustomColumnType.choice, value: (r) => r.eventName, column: (t) => t.eventName),
 ];

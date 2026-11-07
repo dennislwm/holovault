@@ -15,7 +15,7 @@ import 'helpers.dart';
 // Callbacks are never called by the pure builder or parser.
 final _all = <CustomColumn>[
   for (final t in CustomColumnType.values)
-    CustomColumn(t.name, t, (r) => null, (tbl) => tbl.serialNo),
+    (name: t.name, type: t, value: (r) => null, column: (tbl) => tbl.serialNo),
 ];
 
 String _file(Object? rows, {Object? version = 1, Object? format = customFieldsFormat}) =>

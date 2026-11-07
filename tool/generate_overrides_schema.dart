@@ -70,8 +70,8 @@ String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
   final registryLines = extraColumns.map((col) {
     final name = col['name'] as String;
     final field = _camelCase(name);
-    return "  CustomColumn('$name', CustomColumnType.${col['type']}, "
-        '(r) => r.$field, (t) => t.$field),';
+    return "  (name: '$name', type: CustomColumnType.${col['type']}, "
+        'value: (r) => r.$field, column: (t) => t.$field),';
   }).join('\n');
 
   final selectBaseCols =_collectionItemsColumns
@@ -117,13 +117,9 @@ String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
     ..writeln('// overrides-table column (migration, choice suggestion query).')
     ..writeln('enum CustomColumnType { text, bool, int, real, choice, date }')
     ..writeln()
-    ..writeln('class CustomColumn {')
-    ..writeln('  final String name;')
-    ..writeln('  final CustomColumnType type;')
-    ..writeln('  final Object? Function(MergedItem) value;')
-    ..writeln('  final GeneratedColumn Function(\$CollectionItemOverridesTable) column;')
-    ..writeln('  CustomColumn(this.name, this.type, this.value, this.column);')
-    ..writeln('}')
+    ..writeln('typedef CustomColumn = ({String name, CustomColumnType type, '
+        'Object? Function(MergedItem) value, '
+        'GeneratedColumn Function(\$CollectionItemOverridesTable) column});')
     ..writeln()
     ..writeln('final customColumns = <CustomColumn>[')
     ..write(registryLines.isEmpty ? '' : '$registryLines\n')

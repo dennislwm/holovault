@@ -19,7 +19,7 @@ CustomColumn _col(String name) =>
 // The value/column callbacks are never called by collectCustomValues.
 final _allTypes = <CustomColumn>[
   for (final t in CustomColumnType.values)
-    CustomColumn(t.name, t, (r) => null, (tbl) => tbl.serialNo),
+    (name: t.name, type: t, value: (r) => null, column: (tbl) => tbl.serialNo),
 ];
 
 void main() {
@@ -149,11 +149,11 @@ void main() {
       expect([row.name, row.extra, row.serialNo], ['Renamed', 'e1', 'X1']);
 
       // A column that does not exist in the overrides table: a real SQL error.
-      final bad = CustomColumn(
-        'nope',
-        CustomColumnType.text,
-        (r) => null,
-        (t) => GeneratedColumn<String>(
+      final bad = (
+        name: 'nope',
+        type: CustomColumnType.text,
+        value: (r) => null,
+        column: (t) => GeneratedColumn<String>(
           'no_such_col',
           't',
           true,

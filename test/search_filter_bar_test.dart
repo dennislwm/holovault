@@ -191,7 +191,7 @@ void main() {
 
   // REQ-045 (v): a registry with one declared custom text field, `tag`.
   final tagRegistry = <CustomColumn>[
-    CustomColumn('tag', CustomColumnType.text, (r) => r.tag, (t) => t.serialNo),
+    (name: 'tag', type: CustomColumnType.text, value: (r) => r.tag, column: (t) => t.serialNo),
   ];
 
   Future<void> pumpTagged(WidgetTester tester) async {

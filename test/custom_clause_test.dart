@@ -13,12 +13,12 @@ import 'helpers.dart';
 /// REQ-043 (e): a registry holding every type, reading existing MergedItem
 /// fields so no overrides table is needed.
 final registry = <CustomColumn>[
-  CustomColumn('txt', CustomColumnType.text, (r) => r.serialNo, (t) => t.serialNo),
-  CustomColumn('pick', CustomColumnType.choice, (r) => r.preGrade, (t) => t.preGrade),
-  CustomColumn('whole', CustomColumnType.int, (r) => r.quantity, (t) => t.serialNo),
-  CustomColumn('dec', CustomColumnType.real, (r) => r.addCost, (t) => t.addCost),
-  CustomColumn('flag', CustomColumnType.bool, (r) => r.groupWishlist, (t) => t.serialNo),
-  CustomColumn('when', CustomColumnType.date, (r) => r.dateAdded, (t) => t.serialNo),
+  (name: 'txt', type: CustomColumnType.text, value: (r) => r.serialNo, column: (t) => t.serialNo),
+  (name: 'pick', type: CustomColumnType.choice, value: (r) => r.preGrade, column: (t) => t.preGrade),
+  (name: 'whole', type: CustomColumnType.int, value: (r) => r.quantity, column: (t) => t.serialNo),
+  (name: 'dec', type: CustomColumnType.real, value: (r) => r.addCost, column: (t) => t.addCost),
+  (name: 'flag', type: CustomColumnType.bool, value: (r) => r.groupWishlist, column: (t) => t.serialNo),
+  (name: 'when', type: CustomColumnType.date, value: (r) => r.dateAdded, column: (t) => t.serialNo),
 ];
 
 MergedItem item(String name, {String? txt, String? pick, int? whole, double? dec}) =>
