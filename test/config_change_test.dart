@@ -60,6 +60,22 @@ void main() {
       await db.close();
     });
 
+    test('a missing column on an unstamped install is rebuilt in', () async {
+      var db = AppDatabase.withExecutor(NativeDatabase(file));
+      await db.customStatement('DROP TABLE collection_item_overrides');
+      await db.customStatement(
+        'CREATE TABLE collection_item_overrides '
+        '(imported_id TEXT NOT NULL UNIQUE)',
+      );
+      await db.customStatement('PRAGMA application_id = 0');
+      await db.close();
+
+      db = AppDatabase.withExecutor(NativeDatabase(file));
+      await db.saveCustomFields('a1', {'serialNo': 'S3'});
+      expect(await serial(db), 'S3');
+      await db.close();
+    });
+
     test('an extra column on an unstamped install is rebuilt away', () async {
       var db = AppDatabase.withExecutor(NativeDatabase(file));
       await db.customStatement(
