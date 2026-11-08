@@ -114,14 +114,6 @@ This writes `lib/database/overrides_schema.dart` from the config and runs
 drift's own codegen on top of it, so the new column exists as a real typed
 Dart field before the app is rebuilt.
 
-An app already installed on a device follows the change the next time it opens:
-
-- If a custom field was added, renamed, removed or retyped, the app rebuilds
-  its custom-fields table.
-- Every stored custom-field value is lost. Export them first
-  (see "Export and import custom fields") if you want to keep them.
-- Imported collection rows and the set lookup are not touched.
-
 ## Maintainer setup
 
 Requires: [Flutter SDK](https://docs.flutter.dev/get-started/install)
