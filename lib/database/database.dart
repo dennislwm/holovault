@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../custom_field_logic.dart';
 import 'overrides_schema.dart';
 
 part 'database.g.dart';
@@ -142,6 +143,44 @@ class AppDatabase extends _$AppDatabase {
       if (!handled) {
         throw UnsupportedSchemaVersionException(from);
       }
+    },
+    // REQ-055: the build-time custom-field config can change under an
+    // installed app. If the overrides table no longer has the declared
+    // columns, or the stamped fingerprint (SQLite's application_id, which
+    // drift does not use) differs from the declared names and types, drop and
+    // recreate the table and the view. Stored custom values are lost: the
+    // operator accepted that. A 0 stamp is an install from before this
+    // check, judged by its columns alone. A second open finds a match and
+    // changes nothing.
+    beforeOpen: (details) async {
+      final fp = configFingerprint([
+        for (final c in customColumns) '${c.name}:${c.type.name}',
+      ]);
+      final stamp = (await customSelect('PRAGMA application_id').getSingle())
+          .read<int>('application_id');
+      final table = collectionItemOverrides.actualTableName;
+      final have = {
+        for (final r in await customSelect('PRAGMA table_info($table)').get())
+          r.read<String>('name'),
+      };
+      final want = {
+        'imported_id',
+        for (final c in customColumns) c.column(collectionItemOverrides).name,
+      };
+      final stale =
+          have.length != want.length ||
+          !have.containsAll(want) ||
+          (stamp != 0 && stamp != fp);
+      if (!details.wasCreated && stale) {
+        final m = createMigrator();
+        await transaction(() async {
+          await m.drop(mergedItems);
+          await m.drop(collectionItemOverrides);
+          await m.createTable(collectionItemOverrides);
+          await m.createView(mergedItems);
+        });
+      }
+      if (stamp != fp) await customStatement('PRAGMA application_id = $fp');
     },
   );
 
