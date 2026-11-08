@@ -125,8 +125,21 @@ generator stops with a message on a missing or repeated id or name.
 
 An app installed before ids existed recreates its custom-field table once on
 first open: imported item ids are kept, stored custom values are not.
-Changing an entry's `type` and deleting an entry are not handled yet (REQ-055
-is built in slices).
+
+`make gen-overrides` also writes `overrides_snapshot.json`: each id's last name
+and type, a counter, and one step per new id. Commit it with the config and do
+not edit it. On the next open an installed app adds the column of each new id
+(counter above its stored one). Without the file the generator starts a new
+baseline from the current config.
+
+- Rename an entry: keeps its values, no counter change.
+- Delete an entry: its column and values stay in the database, hidden.
+  Adding the id back with the same type restores them.
+- Change an entry's `type`: only `text` and `choice` can swap. Any other
+  change stops the generator (the rest of REQ-055 is built in slices).
+- Change an `id`: stops the generator when a removed id and a new id share
+  a name and type. To start a new field with that name, delete the entry and
+  run `make gen-overrides`, then add it back later.
 
 ## Maintainer setup
 

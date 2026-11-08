@@ -1,0 +1,31 @@
+{
+  "counter": 0,
+  "columns": {
+    "1": {
+      "name": "serialNo",
+      "type": "text"
+    },
+    "2": {
+      "name": "preGrade",
+      "type": "choice"
+    },
+    "3": {
+      "name": "addCost",
+      "type": "real"
+    },
+    "4": {
+      "name": "releasePrice",
+      "type": "real"
+    },
+    "5": {
+      "name": "eventDate",
+      "type": "date"
+    },
+    "6": {
+      "name": "eventName",
+      "type": "choice"
+    }
+  },
+  "removed": {},
+  "steps": []
+}

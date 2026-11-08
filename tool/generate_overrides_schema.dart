@@ -55,6 +55,93 @@ void validateEntries(List<Map<String, dynamic>> entries) {
   }
 }
 
+// A type change between these two needs no physical change (same column).
+const _swappable = {'text', 'choice'};
+
+Map<String, dynamic> _plain(Object? m) => Map<String, dynamic>.from(m as Map);
+
+/// REQ-055 (a), (b), (d), (e): the next snapshot from the config and the
+/// previous snapshot (null = first run: the current config is the baseline,
+/// counter 0, no steps). The snapshot holds the counter, each live id's name
+/// and type, a map of removed ids to their last name and type, and the ordered
+/// steps (step N is counter N). A new id appends an `add` step and bumps the
+/// counter; a rename, a removal, a restore of a removed id with its type, and
+/// a text/choice swap change the snapshot only. Any other type change, and an
+/// id edit (a removed id and a new id with the same name and type), throw.
+/// Pure; the caller writes the file only after this returns.
+Map<String, dynamic> planSnapshot(
+  List<Map<String, dynamic>> entries,
+  Map<String, dynamic>? previous,
+) {
+  validateEntries(entries);
+  final cols = <String, Map<String, dynamic>>{};
+  final removed = <String, Map<String, dynamic>>{};
+  final steps = <Map<String, dynamic>>[];
+  var counter = 0;
+  if (previous != null) {
+    counter = previous['counter'] as int;
+    (previous['columns'] as Map).forEach((k, v) => cols['$k'] = _plain(v));
+    (previous['removed'] as Map).forEach((k, v) => removed['$k'] = _plain(v));
+    steps.addAll((previous['steps'] as List).map(_plain));
+  }
+  final current = {for (final e in entries) '${e['id']}': e};
+  if (previous == null) {
+    for (final e in entries) {
+      cols['${e['id']}'] = {'name': e['name'], 'type': e['type']};
+    }
+  } else {
+    final gone = {
+      for (final k in cols.keys)
+        if (!current.containsKey(k)) k: cols[k]!,
+    };
+    cols.removeWhere((k, _) => gone.containsKey(k));
+    removed.addAll(gone);
+    final fresh = <String, Map<String, dynamic>>{};
+    for (final MapEntry(key: k, value: e) in current.entries) {
+      final type = e['type'] as String;
+      final prior = cols[k] ?? removed[k];
+      if (prior != null) {
+        final was = prior['type'] as String;
+        if (was != type && !(_swappable.contains(was) && _swappable.contains(type))) {
+          throw ArgumentError(
+            'overrides_config.json: id $k changed type from $was to $type; '
+            'only text and choice can swap so far (REQ-055 retype is not built yet)',
+          );
+        }
+        removed.remove(k);
+      } else {
+        fresh[k] = e;
+      }
+      cols[k] = {'name': e['name'], 'type': type};
+    }
+    for (final MapEntry(key: ok, value: o) in gone.entries) {
+      for (final MapEntry(key: nk, value: n) in fresh.entries) {
+        if (o['name'] == n['name'] && o['type'] == n['type']) {
+          throw ArgumentError(
+            'overrides_config.json: id $ok is gone and id $nk has the same name '
+            'and type; an id cannot be edited. To start a new field with that '
+            'name, delete the entry and run the generator, then add it back later',
+          );
+        }
+      }
+    }
+    for (final MapEntry(key: k, value: e) in fresh.entries) {
+      steps.add({'id': int.parse(k), 'kind': 'add', 'type': e['type']});
+      counter++;
+    }
+  }
+  Map<String, dynamic> byId(Map<String, Map<String, dynamic>> m) => {
+        for (final k in (m.keys.toList()..sort((a, b) => int.parse(a).compareTo(int.parse(b)))))
+          k: m[k],
+      };
+  return {
+    'counter': counter,
+    'columns': byId(cols),
+    'removed': byId(removed),
+    'steps': steps,
+  };
+}
+
 // ponytail: drift's Table DSL class has no `$columns`-style introspection
 // (only the generated TableInfo does, which a View's abstract getter can't
 // see at declaration time) -- so CollectionItems' column list is mirrored
@@ -79,16 +166,39 @@ void main() {
   final extraColumns = (config['extraColumns'] as List? ?? [])
       .cast<Map<String, dynamic>>();
 
-  File('lib/database/overrides_schema.dart')
-      .writeAsStringSync(generateOverridesSchema(extraColumns));
+  // REQ-055: the committed snapshot of the last accepted config. Planning
+  // happens first, so a rejected change writes neither file.
+  final snapshotFile = File('overrides_snapshot.json');
+  final previous = snapshotFile.existsSync()
+      ? jsonDecode(snapshotFile.readAsStringSync()) as Map<String, dynamic>
+      : null;
+  final snapshot = planSnapshot(extraColumns, previous);
+  final source = generateOverridesSchema(extraColumns, snapshot);
+
+  File('lib/database/overrides_schema.dart').writeAsStringSync(source);
+  snapshotFile.writeAsStringSync(
+    '${const JsonEncoder.withIndent('  ').convert(snapshot)}\n',
+  );
   stdout.writeln(
-    'Wrote lib/database/overrides_schema.dart (${extraColumns.length} extra column(s))',
+    'Wrote lib/database/overrides_schema.dart (${extraColumns.length} extra column(s), '
+    'counter ${snapshot['counter']}) and overrides_snapshot.json',
   );
 }
 
 /// Pure: declared columns in, generated Dart source out (tested directly).
-String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
+/// [snapshot] is [planSnapshot]'s result; omitted, the config is its own
+/// baseline (counter 0, no steps, no orphans).
+String generateOverridesSchema(
+  List<Map<String, dynamic>> extraColumns, [
+  Map<String, dynamic>? snapshot,
+]) {
   validateEntries(extraColumns);
+  final snap = snapshot ?? planSnapshot(extraColumns, null);
+  final removed = (snap['removed'] as Map).map((k, v) => MapEntry('$k', _plain(v)));
+  final orphanLines = removed.entries.map((o) {
+    final template = _columnTemplates[o.value['type']]!;
+    return '  ${template.replaceAll('{name}', 'orphan${o.key}').replaceAll('{sql}', ".named('cf${o.key}')")}';
+  }).join('\n');
   final columnLines = extraColumns.map((col) {
     final name = col['name'] as String;
     final type = col['type'] as String;
@@ -113,6 +223,17 @@ String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
       .map((name) => '    collectionItems.$name,')
       .join('\n');
 
+  final stepLines = (snap['steps'] as List).map((s) {
+    final m = _plain(s);
+    return "  (id: ${m['id']}, kind: '${m['kind']}', type: '${m['type']}'),";
+  }).join('\n');
+
+  final columnSwitch = [
+    for (final col in extraColumns)
+      '      ${col['id']} => t.${_camelCase(col['name'] as String)},',
+    for (final k in removed.keys) '      $k => t.orphan$k,',
+  ].join('\n');
+
   final selectExtraCols = extraColumns
       .map((col) => '    collectionItemOverrides.${_camelCase(col['name'] as String)},')
       .join('\n');
@@ -127,6 +248,11 @@ String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
     ..writeln('class CollectionItemOverrides extends Table {')
     ..writeln('  TextColumn get importedId => text().unique()();')
     ..write(columnLines.isEmpty ? '' : '$columnLines\n')
+    ..write(orphanLines.isEmpty
+        ? ''
+        : '  // REQ-055 (d): removed ids keep their column and values, declared here\n'
+            '  // so drift matches the physical table; not in the registry or the view.\n')
+    ..write(orphanLines.isEmpty ? '' : '$orphanLines\n')
     ..writeln('}')
     ..writeln()
     ..writeln('abstract class MergedItems extends View {')
@@ -157,9 +283,21 @@ String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
         'Object? Function(MergedItem) value, '
         'GeneratedColumn Function(\$CollectionItemOverridesTable) column});')
     ..writeln()
-    ..writeln('// REQ-055: bumped by the generator when a column is added or retyped.')
-    ..writeln('// ponytail: fixed at 0 until the snapshot slice drives it.')
-    ..writeln('const overrideCounter = 0;')
+    ..writeln('// REQ-055: the counter and its ordered steps come from overrides_snapshot.json;')
+    ..writeln('// step N is counter N. The app replays the steps between its stored')
+    ..writeln('// counter and this one.')
+    ..writeln('const overrideCounter = ${snap['counter']};')
+    ..writeln()
+    ..writeln('const overrideSteps = <({int id, String kind, String type})>[')
+    ..write(stepLines.isEmpty ? '' : '$stepLines\n')
+    ..writeln('];')
+    ..writeln()
+    ..writeln('/// The overrides-table column of config id [id], live or removed; null if none.')
+    ..writeln('GeneratedColumn? overrideColumn(\$CollectionItemOverridesTable t, int id) =>')
+    ..writeln('    switch (id) {')
+    ..write(columnSwitch.isEmpty ? '' : '$columnSwitch\n')
+    ..writeln('      _ => null,')
+    ..writeln('    };')
     ..writeln()
     ..writeln('final customColumns = <CustomColumn>[')
     ..write(registryLines.isEmpty ? '' : '$registryLines\n')

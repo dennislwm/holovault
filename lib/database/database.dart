@@ -149,7 +149,13 @@ class AppDatabase extends _$AppDatabase {
     beforeOpen: (details) async {
       await _ensureCounterTable();
       final have = await customSelect('SELECT value FROM $_counterTable').get();
-      if (have.isNotEmpty) return;
+      if (have.isNotEmpty) {
+        // A stored counter behind the generated one: replay the steps in
+        // between. At or above it: nothing (a rollback is a no-op).
+        final stored = have.first.read<int>('value');
+        if (stored < overrideCounter) await replayOverrideSteps(from: stored);
+        return;
+      }
       await transaction(() async {
         if (!details.wasCreated) await _recreateOverrides();
         await customStatement(
@@ -160,6 +166,48 @@ class AppDatabase extends _$AppDatabase {
   );
 
   static const _counterTable = 'override_counter';
+
+  static String _sqlAffinity(String type) => switch (type) {
+    'text' || 'choice' => 'TEXT',
+    'real' => 'REAL',
+    _ => 'INTEGER',
+  };
+
+  /// REQ-055 (a): replays `steps[from..target)` on the overrides table, then
+  /// recreates the merged view and stores [target], all in one transaction.
+  /// An `add` step adds its column unless it exists; one that exists with a
+  /// different SQLite type fails loudly instead of being reused. Defaults are
+  /// the generated steps; tests pass their own.
+  Future<void> replayOverrideSteps({
+    required int from,
+    int target = overrideCounter,
+    List<({int id, String kind, String type})> steps = overrideSteps,
+  }) => transaction(() async {
+    final m = createMigrator();
+    final table = collectionItemOverrides.actualTableName;
+    final have = {
+      for (final r in await customSelect('PRAGMA table_info($table)').get())
+        r.read<String>('name'): r.read<String>('type'),
+    };
+    for (final s in steps.sublist(from, target)) {
+      if (s.kind != 'add') {
+        throw StateError('unknown override step kind ${s.kind}');
+      }
+      final column = overrideColumn(collectionItemOverrides, s.id);
+      if (column == null) throw StateError('override step names unknown id ${s.id}');
+      final existing = have[column.name];
+      if (existing == null) {
+        await m.addColumn(collectionItemOverrides, column);
+      } else if (existing != _sqlAffinity(s.type)) {
+        throw StateError(
+          'override column ${column.name} exists as $existing, step wants ${s.type}',
+        );
+      }
+    }
+    await m.drop(mergedItems);
+    await m.createView(mergedItems);
+    await customStatement('UPDATE $_counterTable SET value = $target');
+  });
 
   Future<void> _ensureCounterTable() => customStatement(
     'CREATE TABLE IF NOT EXISTS $_counterTable (value INTEGER NOT NULL)',

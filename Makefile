@@ -47,7 +47,8 @@ help:
 	@echo "  clean         flutter clean"
 	@echo "  gen-overrides Regenerate override columns from overrides_config.json"
 	@echo "                Requires: setup"
-	@echo "                Run after editing overrides_config.json"
+	@echo "                Run after editing overrides_config.json; also writes"
+	@echo "                overrides_snapshot.json (commit it, do not edit it)"
 	@echo ""
 
 setup:

@@ -67,9 +67,25 @@ enum CustomColumnType { text, bool, int, real, choice, date }
 // REQ-055: `id` is the permanent config id (null for a derived column).
 typedef CustomColumn = ({int? id, String name, CustomColumnType type, Object? Function(MergedItem) value, GeneratedColumn Function($CollectionItemOverridesTable) column});
 
-// REQ-055: bumped by the generator when a column is added or retyped.
-// ponytail: fixed at 0 until the snapshot slice drives it.
+// REQ-055: the counter and its ordered steps come from overrides_snapshot.json;
+// step N is counter N. The app replays the steps between its stored
+// counter and this one.
 const overrideCounter = 0;
+
+const overrideSteps = <({int id, String kind, String type})>[
+];
+
+/// The overrides-table column of config id [id], live or removed; null if none.
+GeneratedColumn? overrideColumn($CollectionItemOverridesTable t, int id) =>
+    switch (id) {
+      1 => t.serialNo,
+      2 => t.preGrade,
+      3 => t.addCost,
+      4 => t.releasePrice,
+      5 => t.eventDate,
+      6 => t.eventName,
+      _ => null,
+    };
 
 final customColumns = <CustomColumn>[
   (id: 1, name: 'serialNo', type: CustomColumnType.text, value: (r) => r.serialNo, column: (t) => t.serialNo),
