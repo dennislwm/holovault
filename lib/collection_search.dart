@@ -62,7 +62,8 @@ enum SearchOperator {
 }
 
 /// A clause targets a built-in [field] or, REQ-043 (e), a custom field by
-/// [customFieldId] (`cf.<name>`); exactly one is set.
+/// [customFieldId] (`cf<id>`, or `cf.<name>` for a derived column); exactly
+/// one is set.
 class SearchClause {
   const SearchClause({required SearchField this.field, required this.op, required this.value})
       : customFieldId = null;
@@ -73,12 +74,17 @@ class SearchClause {
   final SearchOperator op;
   final String value;
 
-  /// Persisted id: the built-in `SearchField.name` (unchanged) or `cf.<name>`.
+  /// Persisted id: the built-in `SearchField.name` (unchanged), `cf<id>`, or
+  /// `cf.<name>` for a derived column.
   String get fieldId => field?.name ?? customFieldId!;
 
   /// Chip label: the built-in label or the custom field's name, no type suffix.
   String get fieldLabel =>
-      field?.label ?? customFieldId!.substring(customIdPrefix.length);
+      field?.label ??
+      customColumnFor(customFieldId!, readColumns)?.name ??
+      (customFieldId!.startsWith(customIdPrefix)
+          ? customFieldId!.substring(customIdPrefix.length)
+          : customFieldId!);
 
   /// REQ-034 (ADR-19): `jsonEncode` can't serialize enum fields directly --
   /// this explicit map conversion is the required step, per ADR-19's own
@@ -111,9 +117,9 @@ List<String> pickerFieldIds(List<SearchClause> existing, [List<CustomColumn>? re
   return [
     for (final f in availableFields(existing)) f.name,
     for (final c in reg)
-      if (c.type != CustomColumnType.date) customId(c.name),
+      if (c.type != CustomColumnType.date) customIdFor(c),
     for (final c in reg)
-      if (c.type == CustomColumnType.date) customId(c.name),
+      if (c.type == CustomColumnType.date) customIdFor(c),
   ];
 }
 
@@ -324,18 +330,34 @@ final List<String> sortKeyIds = [
   for (final f in SearchField.values) f.name,
 ];
 
-/// REQ-043 (d): a custom field's list id is `cf.<name>`, so it cannot collide
-/// with a built-in id. Stored by string like the built-ins.
+/// REQ-043 (d): a derived column's list id is `cf.<name>`, so it cannot
+/// collide with a built-in id. Stored by string like the built-ins.
 const customIdPrefix = 'cf.';
 String customId(String name) => '$customIdPrefix$name';
 
+/// REQ-055: a stored custom field's list id, pref id and form key is
+/// `cf<id>` (its permanent config id, so a rename keeps it); a derived column
+/// has no id and keeps `cf.<name>`.
+String customIdFor(CustomColumn c) => c.id == null ? customId(c.name) : 'cf${c.id}';
+
+final _storedCustomId = RegExp(r'^cf(\d+)$');
+
 /// The declared custom column behind [id], or null (not a custom id, or no
-/// longer declared).
+/// longer declared). A name-keyed `cf.<name>` id matches only a column with no
+/// id, so a pref saved before ids existed is skipped, not remapped.
 CustomColumn? customColumnFor(String id, List<CustomColumn> registry) {
+  final stored = _storedCustomId.firstMatch(id);
+  if (stored != null) {
+    final n = int.parse(stored.group(1)!);
+    for (final c in registry) {
+      if (c.id == n) return c;
+    }
+    return null;
+  }
   if (!id.startsWith(customIdPrefix)) return null;
   final name = id.substring(customIdPrefix.length);
   for (final c in registry) {
-    if (c.name == name) return c;
+    if (c.id == null && c.name == name) return c;
   }
   return null;
 }
@@ -343,7 +365,7 @@ CustomColumn? customColumnFor(String id, List<CustomColumn> registry) {
 /// Every id a column can show: built-ins first, then declared custom ones.
 List<String> columnIdsFor([List<CustomColumn>? registry]) => [
       ...sortKeyIds,
-      for (final c in registry ?? readColumns) customId(c.name),
+      for (final c in registry ?? readColumns) customIdFor(c),
     ];
 
 /// Ids a list can sort by: every column id (date columns since slice (f)).

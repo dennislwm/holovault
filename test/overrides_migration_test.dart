@@ -11,8 +11,8 @@ import '../tool/generate_overrides_schema.dart';
 void main() {
   group('REQ-043 (a) registry generation', () {
     final out = generateOverridesSchema([
-      {'name': 'preGrade', 'type': 'choice'},
-      {'name': 'seenOn', 'type': 'date'},
+      {'id': 1, 'name': 'preGrade', 'type': 'choice'},
+      {'id': 2, 'name': 'seenOn', 'type': 'date'},
     ]);
 
     test('choice and date keep their type in the registry; storage differs', () {
@@ -25,7 +25,7 @@ void main() {
     test('an unknown type still fails loudly', () {
       expect(
         () => generateOverridesSchema([
-          {'name': 'x', 'type': 'money'},
+          {'id': 1, 'name': 'x', 'type': 'money'},
         ]),
         throwsArgumentError,
       );
@@ -43,6 +43,8 @@ void main() {
       final db = AppDatabase.withExecutor(NativeDatabase(dbFile));
       await db.customStatement('DROP VIEW merged_items');
       await db.customStatement('DROP TABLE collection_item_overrides');
+      // A real v3 install predates the REQ-055 counter.
+      await db.customStatement('DROP TABLE override_counter');
       await db.customStatement(
         'CREATE TABLE collection_item_overrides '
         '(imported_id TEXT NOT NULL UNIQUE)',

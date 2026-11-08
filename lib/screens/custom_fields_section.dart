@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 
+import '../collection_search.dart';
 import '../custom_field_logic.dart';
 import '../database/database.dart';
 import '../database/overrides_schema.dart';
 
-String _fieldName(CustomColumn c) => 'cf.${c.name}';
+String _fieldName(CustomColumn c) => customIdFor(c);
 
 /// REQ-043 (b): maps the form's raw values to a name-to-value map for
 /// [AppDatabase.saveCustomFields]. Empty text and choice become null. A column

@@ -114,21 +114,18 @@ class AppDatabase extends _$AppDatabase {
         // true during the single migration off an older schema).
         await m.createTable(collectionItemOverrides);
         await m.createView(mergedItems);
+        // REQ-055: the table above already has the current columns, so the
+        // counter is written here and beforeOpen has nothing to recreate.
+        await _ensureCounterTable();
+        await customStatement(
+          'INSERT INTO $_counterTable (value) VALUES ($overrideCounter)',
+        );
         handled = true;
       }
-      if (from == 3) {
-        // REQ-043: v3 installs have an overrides table with only the key
-        // column. Add every declared custom column and rebuild the view so
-        // it selects them. nullable, so existing rows need no default.
-        // (from < 3 needs none of this: createTable above already used the
-        // current definition.)
-        for (final c in customColumns) {
-          await m.addColumn(collectionItemOverrides, c.column(collectionItemOverrides));
-        }
-        await m.drop(mergedItems);
-        await m.createView(mergedItems);
-        handled = true;
-      }
+      // REQ-055: installs at version 3, 4 and 5 have no counter and a
+      // key-only or name-keyed overrides table; beforeOpen recreates it once.
+      // (The REQ-043 `from == 3` branch that added columns by registry is
+      // superseded by that.)
       if (from < 5) {
         // REQ-052: the set lookup table is new in version 5. Every install
         // below 5 gets it here, whichever branch above also ran.
@@ -143,7 +140,45 @@ class AppDatabase extends _$AppDatabase {
         throw UnsupportedSchemaVersionException(from);
       }
     },
+    // REQ-055: an overrides table whose columns follow the config ids. A
+    // database with no counter row is the earlier name-keyed schema (or a
+    // fresh one): recreate its overrides table once, keeping the imported
+    // ids, then write the counter. An existing counter, whatever its value,
+    // changes nothing, so a second open is a no-op. The counter write is in
+    // the same transaction as the recreate.
+    beforeOpen: (details) async {
+      await _ensureCounterTable();
+      final have = await customSelect('SELECT value FROM $_counterTable').get();
+      if (have.isNotEmpty) return;
+      await transaction(() async {
+        if (!details.wasCreated) await _recreateOverrides();
+        await customStatement(
+          'INSERT INTO $_counterTable (value) VALUES ($overrideCounter)',
+        );
+      });
+    },
   );
+
+  static const _counterTable = 'override_counter';
+
+  Future<void> _ensureCounterTable() => customStatement(
+    'CREATE TABLE IF NOT EXISTS $_counterTable (value INTEGER NOT NULL)',
+  );
+
+  /// Drops the view, replaces the overrides table with one of the current
+  /// definition (copying only the imported ids), and recreates the view.
+  Future<void> _recreateOverrides() async {
+    final m = createMigrator();
+    final table = collectionItemOverrides.actualTableName;
+    await m.drop(mergedItems);
+    await customStatement('ALTER TABLE $table RENAME TO ${table}_old');
+    await m.createTable(collectionItemOverrides);
+    await customStatement(
+      'INSERT INTO $table (imported_id) SELECT imported_id FROM ${table}_old',
+    );
+    await customStatement('DROP TABLE ${table}_old');
+    await m.createView(mergedItems);
+  }
 
   /// Inserts a collection item, or updates it in place if `importedId`
   /// already exists -- re-running an import with the same source data

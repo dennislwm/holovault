@@ -10,12 +10,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 // REQ-043 (d): a registry holding every type, read from existing merged-row
 // fields (the real config declares only text, choice and real).
 final _registry = <CustomColumn>[
-  (name: 'tag', type: CustomColumnType.text, value: (r) => r.tag, column: (t) => t.serialNo),
-  (name: 'grade', type: CustomColumnType.choice, value: (r) => r.gradeSubtype, column: (t) => t.serialNo),
-  (name: 'qty', type: CustomColumnType.int, value: (r) => r.quantity, column: (t) => t.serialNo),
-  (name: 'cost', type: CustomColumnType.real, value: (r) => r.paidTotal, column: (t) => t.serialNo),
-  (name: 'wish', type: CustomColumnType.bool, value: (r) => r.groupWishlist, column: (t) => t.serialNo),
-  (name: 'when', type: CustomColumnType.date, value: (r) => r.dateAdded, column: (t) => t.serialNo),
+  (id: null, name: 'tag', type: CustomColumnType.text, value: (r) => r.tag, column: (t) => t.serialNo),
+  (id: null, name: 'grade', type: CustomColumnType.choice, value: (r) => r.gradeSubtype, column: (t) => t.serialNo),
+  (id: null, name: 'qty', type: CustomColumnType.int, value: (r) => r.quantity, column: (t) => t.serialNo),
+  (id: null, name: 'cost', type: CustomColumnType.real, value: (r) => r.paidTotal, column: (t) => t.serialNo),
+  (id: null, name: 'wish', type: CustomColumnType.bool, value: (r) => r.groupWishlist, column: (t) => t.serialNo),
+  (id: null, name: 'when', type: CustomColumnType.date, value: (r) => r.dateAdded, column: (t) => t.serialNo),
 ];
 
 MergedItem _item(int id, {String? tag, int? qty, double? cost, bool? wish, DateTime? when}) =>

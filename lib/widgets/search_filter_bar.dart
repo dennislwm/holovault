@@ -406,7 +406,7 @@ class _AddClauseSheet extends StatefulWidget {
 }
 
 class _AddClauseSheetState extends State<_AddClauseSheet> {
-  String? _field; // field id: SearchField.name or cf.<name>
+  String? _field; // field id: SearchField.name, cf<id> or (derived) cf.<name>
   SearchOperator? _op;
   String? _textValue;
   final _valueController = TextEditingController();

@@ -77,7 +77,9 @@ carries two items that move only the custom-field values, not the collection:
    first; if anything is wrong the import is refused and nothing is written.
 
 Rows for items that are no longer imported are kept and exported. Import
-skips any column that is no longer declared.
+skips any column that is no longer declared. A field's key in the file is
+`cf<id>` (see [Override columns](#override-columns)); a file keyed by field
+names, written before ids existed, imports every row with all values skipped.
 
 ## Import the set lookup
 
@@ -113,6 +115,18 @@ in `overrides_config.json`, then regenerate:
 This writes `lib/database/overrides_schema.dart` from the config and runs
 drift's own codegen on top of it, so the new column exists as a real typed
 Dart field before the app is rebuilt.
+
+Each entry has a permanent integer `id` (1 or more, written once, never
+edited or reused) and a unique `name`. The database column is `cf<id>`, so
+renaming an entry keeps its stored values. The `name` is the label and the
+Dart getter, so it must be a lower-camel identifier. The same `cf<id>` is the
+field's id in saved list settings and its key in the export file. The
+generator stops with a message on a missing or repeated id or name.
+
+An app installed before ids existed recreates its custom-field table once on
+first open: imported item ids are kept, stored custom values are not.
+Changing an entry's `type` and deleting an entry are not handled yet (REQ-055
+is built in slices).
 
 ## Maintainer setup
 

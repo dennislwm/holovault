@@ -19,7 +19,7 @@ CustomColumn _col(String name) =>
 // The value/column callbacks are never called by collectCustomValues.
 final _allTypes = <CustomColumn>[
   for (final t in CustomColumnType.values)
-    (name: t.name, type: t, value: (r) => null, column: (tbl) => tbl.serialNo),
+    (id: null, name: t.name, type: t, value: (r) => null, column: (tbl) => tbl.serialNo),
 ];
 
 void main() {
@@ -150,6 +150,7 @@ void main() {
 
       // A column that does not exist in the overrides table: a real SQL error.
       final bad = (
+        id: null,
         name: 'nope',
         type: CustomColumnType.text,
         value: (r) => null,

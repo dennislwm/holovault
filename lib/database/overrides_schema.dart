@@ -6,12 +6,12 @@ import 'database.dart';
 
 class CollectionItemOverrides extends Table {
   TextColumn get importedId => text().unique()();
-  TextColumn get serialNo => text().nullable()();
-  TextColumn get preGrade => text().nullable()();
-  RealColumn get addCost => real().nullable()();
-  RealColumn get releasePrice => real().nullable()();
-  DateTimeColumn get eventDate => dateTime().nullable()();
-  TextColumn get eventName => text().nullable()();
+  TextColumn get serialNo => text().named('cf1').nullable()();
+  TextColumn get preGrade => text().named('cf2').nullable()();
+  RealColumn get addCost => real().named('cf3').nullable()();
+  RealColumn get releasePrice => real().named('cf4').nullable()();
+  DateTimeColumn get eventDate => dateTime().named('cf5').nullable()();
+  TextColumn get eventName => text().named('cf6').nullable()();
 }
 
 abstract class MergedItems extends View {
@@ -64,13 +64,18 @@ abstract class MergedItems extends View {
 // overrides-table column (migration, choice suggestion query).
 enum CustomColumnType { text, bool, int, real, choice, date }
 
-typedef CustomColumn = ({String name, CustomColumnType type, Object? Function(MergedItem) value, GeneratedColumn Function($CollectionItemOverridesTable) column});
+// REQ-055: `id` is the permanent config id (null for a derived column).
+typedef CustomColumn = ({int? id, String name, CustomColumnType type, Object? Function(MergedItem) value, GeneratedColumn Function($CollectionItemOverridesTable) column});
+
+// REQ-055: bumped by the generator when a column is added or retyped.
+// ponytail: fixed at 0 until the snapshot slice drives it.
+const overrideCounter = 0;
 
 final customColumns = <CustomColumn>[
-  (name: 'serialNo', type: CustomColumnType.text, value: (r) => r.serialNo, column: (t) => t.serialNo),
-  (name: 'preGrade', type: CustomColumnType.choice, value: (r) => r.preGrade, column: (t) => t.preGrade),
-  (name: 'addCost', type: CustomColumnType.real, value: (r) => r.addCost, column: (t) => t.addCost),
-  (name: 'releasePrice', type: CustomColumnType.real, value: (r) => r.releasePrice, column: (t) => t.releasePrice),
-  (name: 'eventDate', type: CustomColumnType.date, value: (r) => r.eventDate, column: (t) => t.eventDate),
-  (name: 'eventName', type: CustomColumnType.choice, value: (r) => r.eventName, column: (t) => t.eventName),
+  (id: 1, name: 'serialNo', type: CustomColumnType.text, value: (r) => r.serialNo, column: (t) => t.serialNo),
+  (id: 2, name: 'preGrade', type: CustomColumnType.choice, value: (r) => r.preGrade, column: (t) => t.preGrade),
+  (id: 3, name: 'addCost', type: CustomColumnType.real, value: (r) => r.addCost, column: (t) => t.addCost),
+  (id: 4, name: 'releasePrice', type: CustomColumnType.real, value: (r) => r.releasePrice, column: (t) => t.releasePrice),
+  (id: 5, name: 'eventDate', type: CustomColumnType.date, value: (r) => r.eventDate, column: (t) => t.eventDate),
+  (id: 6, name: 'eventName', type: CustomColumnType.choice, value: (r) => r.eventName, column: (t) => t.eventName),
 ];

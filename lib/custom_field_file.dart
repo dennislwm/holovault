@@ -10,6 +10,10 @@ const customFieldsVersion = 1;
 /// One overrides row as read from the table: the key and typed raw values.
 typedef OverrideRowData = ({String importedId, Map<String, Object?> values});
 
+/// REQ-055: the key of a field in the file is `cf<id>`, so a rename does not
+/// change it. A column with no id (test registries only) keeps its name.
+String customFileKey(CustomColumn c) => c.id == null ? c.name : 'cf${c.id}';
+
 Object? _encode(CustomColumn c, Object? v) {
   if (v == null) return null;
   return c.type == CustomColumnType.date
@@ -31,7 +35,7 @@ String buildCustomFieldsFile(
       for (final r in rows)
         {
           'importedId': r.importedId,
-          'values': {for (final c in cols) c.name: _encode(c, r.values[c.name])},
+          'values': {for (final c in cols) customFileKey(c): _encode(c, r.values[c.name])},
         },
     ],
   };
@@ -53,7 +57,7 @@ CustomFieldsParse parseCustomFieldsFile(
   String text, [
   List<CustomColumn>? registry,
 ]) {
-  final cols = {for (final c in registry ?? customColumns) c.name: c};
+  final cols = {for (final c in registry ?? customColumns) customFileKey(c): c};
   const bad = CustomFieldsParse.refused;
   final Object? doc;
   try {

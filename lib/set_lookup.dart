@@ -23,6 +23,7 @@ Future<void> refreshSetLookup(AppDatabase db) async {
 }
 
 CustomColumn _derived(String name, String? Function(SetLookupRow) pick) => (
+      id: null,
       name: name,
       type: CustomColumnType.text,
       value: (r) {

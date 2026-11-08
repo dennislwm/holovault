@@ -1143,37 +1143,37 @@ class $CollectionItemOverridesTable extends CollectionItemOverrides
       const VerificationMeta('serialNo');
   @override
   late final GeneratedColumn<String> serialNo = GeneratedColumn<String>(
-      'serial_no', aliasedName, true,
+      'cf1', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _preGradeMeta =
       const VerificationMeta('preGrade');
   @override
   late final GeneratedColumn<String> preGrade = GeneratedColumn<String>(
-      'pre_grade', aliasedName, true,
+      'cf2', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _addCostMeta =
       const VerificationMeta('addCost');
   @override
   late final GeneratedColumn<double> addCost = GeneratedColumn<double>(
-      'add_cost', aliasedName, true,
+      'cf3', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _releasePriceMeta =
       const VerificationMeta('releasePrice');
   @override
   late final GeneratedColumn<double> releasePrice = GeneratedColumn<double>(
-      'release_price', aliasedName, true,
+      'cf4', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _eventDateMeta =
       const VerificationMeta('eventDate');
   @override
   late final GeneratedColumn<DateTime> eventDate = GeneratedColumn<DateTime>(
-      'event_date', aliasedName, true,
+      'cf5', aliasedName, true,
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
   static const VerificationMeta _eventNameMeta =
       const VerificationMeta('eventName');
   @override
   late final GeneratedColumn<String> eventName = GeneratedColumn<String>(
-      'event_name', aliasedName, true,
+      'cf6', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
@@ -1204,31 +1204,29 @@ class $CollectionItemOverridesTable extends CollectionItemOverrides
     } else if (isInserting) {
       context.missing(_importedIdMeta);
     }
-    if (data.containsKey('serial_no')) {
+    if (data.containsKey('cf1')) {
       context.handle(_serialNoMeta,
-          serialNo.isAcceptableOrUnknown(data['serial_no']!, _serialNoMeta));
+          serialNo.isAcceptableOrUnknown(data['cf1']!, _serialNoMeta));
     }
-    if (data.containsKey('pre_grade')) {
+    if (data.containsKey('cf2')) {
       context.handle(_preGradeMeta,
-          preGrade.isAcceptableOrUnknown(data['pre_grade']!, _preGradeMeta));
+          preGrade.isAcceptableOrUnknown(data['cf2']!, _preGradeMeta));
     }
-    if (data.containsKey('add_cost')) {
+    if (data.containsKey('cf3')) {
       context.handle(_addCostMeta,
-          addCost.isAcceptableOrUnknown(data['add_cost']!, _addCostMeta));
+          addCost.isAcceptableOrUnknown(data['cf3']!, _addCostMeta));
     }
-    if (data.containsKey('release_price')) {
-      context.handle(
-          _releasePriceMeta,
-          releasePrice.isAcceptableOrUnknown(
-              data['release_price']!, _releasePriceMeta));
+    if (data.containsKey('cf4')) {
+      context.handle(_releasePriceMeta,
+          releasePrice.isAcceptableOrUnknown(data['cf4']!, _releasePriceMeta));
     }
-    if (data.containsKey('event_date')) {
+    if (data.containsKey('cf5')) {
       context.handle(_eventDateMeta,
-          eventDate.isAcceptableOrUnknown(data['event_date']!, _eventDateMeta));
+          eventDate.isAcceptableOrUnknown(data['cf5']!, _eventDateMeta));
     }
-    if (data.containsKey('event_name')) {
+    if (data.containsKey('cf6')) {
       context.handle(_eventNameMeta,
-          eventName.isAcceptableOrUnknown(data['event_name']!, _eventNameMeta));
+          eventName.isAcceptableOrUnknown(data['cf6']!, _eventNameMeta));
     }
     return context;
   }
@@ -1242,17 +1240,17 @@ class $CollectionItemOverridesTable extends CollectionItemOverrides
       importedId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}imported_id'])!,
       serialNo: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}serial_no']),
+          .read(DriftSqlType.string, data['${effectivePrefix}cf1']),
       preGrade: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}pre_grade']),
+          .read(DriftSqlType.string, data['${effectivePrefix}cf2']),
       addCost: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}add_cost']),
+          .read(DriftSqlType.double, data['${effectivePrefix}cf3']),
       releasePrice: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}release_price']),
+          .read(DriftSqlType.double, data['${effectivePrefix}cf4']),
       eventDate: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}event_date']),
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cf5']),
       eventName: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}event_name']),
+          .read(DriftSqlType.string, data['${effectivePrefix}cf6']),
     );
   }
 
@@ -1284,22 +1282,22 @@ class CollectionItemOverride extends DataClass
     final map = <String, Expression>{};
     map['imported_id'] = Variable<String>(importedId);
     if (!nullToAbsent || serialNo != null) {
-      map['serial_no'] = Variable<String>(serialNo);
+      map['cf1'] = Variable<String>(serialNo);
     }
     if (!nullToAbsent || preGrade != null) {
-      map['pre_grade'] = Variable<String>(preGrade);
+      map['cf2'] = Variable<String>(preGrade);
     }
     if (!nullToAbsent || addCost != null) {
-      map['add_cost'] = Variable<double>(addCost);
+      map['cf3'] = Variable<double>(addCost);
     }
     if (!nullToAbsent || releasePrice != null) {
-      map['release_price'] = Variable<double>(releasePrice);
+      map['cf4'] = Variable<double>(releasePrice);
     }
     if (!nullToAbsent || eventDate != null) {
-      map['event_date'] = Variable<DateTime>(eventDate);
+      map['cf5'] = Variable<DateTime>(eventDate);
     }
     if (!nullToAbsent || eventName != null) {
-      map['event_name'] = Variable<String>(eventName);
+      map['cf6'] = Variable<String>(eventName);
     }
     return map;
   }
@@ -1461,12 +1459,12 @@ class CollectionItemOverridesCompanion
   }) {
     return RawValuesInsertable({
       if (importedId != null) 'imported_id': importedId,
-      if (serialNo != null) 'serial_no': serialNo,
-      if (preGrade != null) 'pre_grade': preGrade,
-      if (addCost != null) 'add_cost': addCost,
-      if (releasePrice != null) 'release_price': releasePrice,
-      if (eventDate != null) 'event_date': eventDate,
-      if (eventName != null) 'event_name': eventName,
+      if (serialNo != null) 'cf1': serialNo,
+      if (preGrade != null) 'cf2': preGrade,
+      if (addCost != null) 'cf3': addCost,
+      if (releasePrice != null) 'cf4': releasePrice,
+      if (eventDate != null) 'cf5': eventDate,
+      if (eventName != null) 'cf6': eventName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1499,22 +1497,22 @@ class CollectionItemOverridesCompanion
       map['imported_id'] = Variable<String>(importedId.value);
     }
     if (serialNo.present) {
-      map['serial_no'] = Variable<String>(serialNo.value);
+      map['cf1'] = Variable<String>(serialNo.value);
     }
     if (preGrade.present) {
-      map['pre_grade'] = Variable<String>(preGrade.value);
+      map['cf2'] = Variable<String>(preGrade.value);
     }
     if (addCost.present) {
-      map['add_cost'] = Variable<double>(addCost.value);
+      map['cf3'] = Variable<double>(addCost.value);
     }
     if (releasePrice.present) {
-      map['release_price'] = Variable<double>(releasePrice.value);
+      map['cf4'] = Variable<double>(releasePrice.value);
     }
     if (eventDate.present) {
-      map['event_date'] = Variable<DateTime>(eventDate.value);
+      map['cf5'] = Variable<DateTime>(eventDate.value);
     }
     if (eventName.present) {
-      map['event_name'] = Variable<String>(eventName.value);
+      map['cf6'] = Variable<String>(eventName.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -2237,17 +2235,17 @@ class $MergedItemsView extends ViewInfo<$MergedItemsView, MergedItem>
       tag: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}tag']),
       serialNo: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}serial_no']),
+          .read(DriftSqlType.string, data['${effectivePrefix}cf1']),
       preGrade: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}pre_grade']),
+          .read(DriftSqlType.string, data['${effectivePrefix}cf2']),
       addCost: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}add_cost']),
+          .read(DriftSqlType.double, data['${effectivePrefix}cf3']),
       releasePrice: attachedDatabase.typeMapping
-          .read(DriftSqlType.double, data['${effectivePrefix}release_price']),
+          .read(DriftSqlType.double, data['${effectivePrefix}cf4']),
       eventDate: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}event_date']),
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}cf5']),
       eventName: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}event_name']),
+          .read(DriftSqlType.string, data['${effectivePrefix}cf6']),
     );
   }
 
@@ -2350,27 +2348,27 @@ class $MergedItemsView extends ViewInfo<$MergedItemsView, MergedItem>
       generatedAs: GeneratedAs(collectionItems.tag, false),
       type: DriftSqlType.string);
   late final GeneratedColumn<String> serialNo = GeneratedColumn<String>(
-      'serial_no', aliasedName, true,
+      'cf1', aliasedName, true,
       generatedAs: GeneratedAs(collectionItemOverrides.serialNo, false),
       type: DriftSqlType.string);
   late final GeneratedColumn<String> preGrade = GeneratedColumn<String>(
-      'pre_grade', aliasedName, true,
+      'cf2', aliasedName, true,
       generatedAs: GeneratedAs(collectionItemOverrides.preGrade, false),
       type: DriftSqlType.string);
   late final GeneratedColumn<double> addCost = GeneratedColumn<double>(
-      'add_cost', aliasedName, true,
+      'cf3', aliasedName, true,
       generatedAs: GeneratedAs(collectionItemOverrides.addCost, false),
       type: DriftSqlType.double);
   late final GeneratedColumn<double> releasePrice = GeneratedColumn<double>(
-      'release_price', aliasedName, true,
+      'cf4', aliasedName, true,
       generatedAs: GeneratedAs(collectionItemOverrides.releasePrice, false),
       type: DriftSqlType.double);
   late final GeneratedColumn<DateTime> eventDate = GeneratedColumn<DateTime>(
-      'event_date', aliasedName, true,
+      'cf5', aliasedName, true,
       generatedAs: GeneratedAs(collectionItemOverrides.eventDate, false),
       type: DriftSqlType.dateTime);
   late final GeneratedColumn<String> eventName = GeneratedColumn<String>(
-      'event_name', aliasedName, true,
+      'cf6', aliasedName, true,
       generatedAs: GeneratedAs(collectionItemOverrides.eventName, false),
       type: DriftSqlType.string);
   @override

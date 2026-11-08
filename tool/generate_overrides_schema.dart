@@ -10,16 +10,50 @@
 import 'dart:convert';
 import 'dart:io';
 
+// REQ-055: `{sql}` is replaced by `.named('cf<id>')`, so the physical column
+// follows the entry's permanent id while the Dart getter follows its name.
 const _columnTemplates = {
-  'text': 'TextColumn get {name} => text().nullable()();',
-  'bool': 'BoolColumn get {name} => boolean().nullable()();',
-  'int': 'IntColumn get {name} => integer().nullable()();',
-  'real': 'RealColumn get {name} => real().nullable()();',
+  'text': 'TextColumn get {name} => text(){sql}.nullable()();',
+  'bool': 'BoolColumn get {name} => boolean(){sql}.nullable()();',
+  'int': 'IntColumn get {name} => integer(){sql}.nullable()();',
+  'real': 'RealColumn get {name} => real(){sql}.nullable()();',
   // REQ-043: choice stores as text (the type only changes the editor input
   // and the registry entry); date is a nullable date-time.
-  'choice': 'TextColumn get {name} => text().nullable()();',
-  'date': 'DateTimeColumn get {name} => dateTime().nullable()();',
+  'choice': 'TextColumn get {name} => text(){sql}.nullable()();',
+  'date': 'DateTimeColumn get {name} => dateTime(){sql}.nullable()();',
 };
+
+final _identifier = RegExp(r'^[a-z][A-Za-z0-9]*$');
+
+/// REQ-055 (f): every entry needs a positive integer `id` and a `name`, both
+/// unique. The name becomes a Dart getter, so it must be a lower-camel
+/// identifier (slice 1 ceiling: a rename changes the getter, so code that
+/// names the getter directly needs the same edit). Fails before any output.
+void validateEntries(List<Map<String, dynamic>> entries) {
+  final ids = <int>{};
+  final names = <String>{};
+  for (final e in entries) {
+    final id = e['id'];
+    final name = e['name'];
+    if (id is! int || id < 1) {
+      throw ArgumentError(
+        'overrides_config.json: entry ${name ?? e} needs a positive integer "id", got $id',
+      );
+    }
+    if (!ids.add(id)) {
+      throw ArgumentError('overrides_config.json: duplicate id $id');
+    }
+    if (name is! String || !_identifier.hasMatch(name)) {
+      throw ArgumentError(
+        'overrides_config.json: id $id needs a "name" that is a lower-camel '
+        'identifier (letters and digits, starting with a lowercase letter), got $name',
+      );
+    }
+    if (!names.add(name)) {
+      throw ArgumentError('overrides_config.json: duplicate name "$name"');
+    }
+  }
+}
 
 // ponytail: drift's Table DSL class has no `$columns`-style introspection
 // (only the generated TableInfo does, which a View's abstract getter can't
@@ -54,6 +88,7 @@ void main() {
 
 /// Pure: declared columns in, generated Dart source out (tested directly).
 String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
+  validateEntries(extraColumns);
   final columnLines = extraColumns.map((col) {
     final name = col['name'] as String;
     final type = col['type'] as String;
@@ -64,13 +99,13 @@ String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
         '(expected one of ${_columnTemplates.keys.join(', ')})',
       );
     }
-    return '  ${template.replaceAll('{name}', _camelCase(name))}';
+    return '  ${template.replaceAll('{name}', _camelCase(name)).replaceAll('{sql}', ".named('cf${col['id']}')")}';
   }).join('\n');
 
   final registryLines = extraColumns.map((col) {
     final name = col['name'] as String;
     final field = _camelCase(name);
-    return "  (name: '$name', type: CustomColumnType.${col['type']}, "
+    return "  (id: ${col['id']}, name: '$name', type: CustomColumnType.${col['type']}, "
         'value: (r) => r.$field, column: (t) => t.$field),';
   }).join('\n');
 
@@ -117,9 +152,14 @@ String generateOverridesSchema(List<Map<String, dynamic>> extraColumns) {
     ..writeln('// overrides-table column (migration, choice suggestion query).')
     ..writeln('enum CustomColumnType { text, bool, int, real, choice, date }')
     ..writeln()
-    ..writeln('typedef CustomColumn = ({String name, CustomColumnType type, '
+    ..writeln('// REQ-055: `id` is the permanent config id (null for a derived column).')
+    ..writeln('typedef CustomColumn = ({int? id, String name, CustomColumnType type, '
         'Object? Function(MergedItem) value, '
         'GeneratedColumn Function(\$CollectionItemOverridesTable) column});')
+    ..writeln()
+    ..writeln('// REQ-055: bumped by the generator when a column is added or retyped.')
+    ..writeln('// ponytail: fixed at 0 until the snapshot slice drives it.')
+    ..writeln('const overrideCounter = 0;')
     ..writeln()
     ..writeln('final customColumns = <CustomColumn>[')
     ..write(registryLines.isEmpty ? '' : '$registryLines\n')

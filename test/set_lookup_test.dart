@@ -201,6 +201,14 @@ void main() {
       // Build the v4 shape: no lookup table, user_version 4, one item, one override.
       final db = AppDatabase.withExecutor(NativeDatabase(dbFile));
       await db.customStatement('DROP TABLE set_lookup_rows');
+      // A real v4 install: name-keyed override column, no REQ-055 counter.
+      await db.customStatement('DROP VIEW merged_items');
+      await db.customStatement('DROP TABLE collection_item_overrides');
+      await db.customStatement('DROP TABLE override_counter');
+      await db.customStatement(
+        'CREATE TABLE collection_item_overrides '
+        '(imported_id TEXT NOT NULL UNIQUE, serial_no TEXT)',
+      );
       await db.customStatement(
         "INSERT INTO collection_items (imported_id, name) VALUES ('a1', 'X')",
       );
@@ -218,8 +226,13 @@ void main() {
       expect(await db.allSetLookupRows(), isEmpty);
       final items = await db.customSelect('SELECT name FROM collection_items').get();
       expect(items.single.data['name'], 'X');
-      final ov = await db.customSelect('SELECT serial_no FROM collection_item_overrides').get();
-      expect(ov.single.data['serial_no'], 'S1');
+      // REQ-055: the overrides table is recreated with id-keyed columns; the
+      // row key is kept, the old name-keyed value is not migrated (no values
+      // exist under the old schema, operator 2026-11-08).
+      final ov = await db.customSelect('SELECT * FROM collection_item_overrides').get();
+      expect(ov.single.data['imported_id'], 'a1');
+      expect(ov.single.data.containsKey('cf1'), isTrue);
+      expect(ov.single.data.containsKey('serial_no'), isFalse);
       await db.close();
     });
 

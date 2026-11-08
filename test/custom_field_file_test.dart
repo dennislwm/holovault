@@ -15,7 +15,7 @@ import 'helpers.dart';
 // Callbacks are never called by the pure builder or parser.
 final _all = <CustomColumn>[
   for (final t in CustomColumnType.values)
-    (name: t.name, type: t, value: (r) => null, column: (tbl) => tbl.serialNo),
+    (id: null, name: t.name, type: t, value: (r) => null, column: (tbl) => tbl.serialNo),
 ];
 
 String _file(Object? rows, {Object? version = 1, Object? format = customFieldsFormat}) =>
@@ -174,19 +174,19 @@ void main() {
       final rows = doc['rows'] as List;
       expect(rows.map((r) => (r as Map)['importedId']), ['c1', 'gone']);
       expect((rows[0] as Map)['values'], {
-        'serialNo': 'S1',
-        'addCost': null,
-        'eventDate': '2026-02-03T04:05:00.000',
+        'cf1': 'S1',
+        'cf3': null,
+        'cf5': '2026-02-03T04:05:00.000',
       });
-      expect((rows[1] as Map)['values']['addCost'], 9.5);
+      expect((rows[1] as Map)['values']['cf3'], 9.5);
     });
 
     test('import upserts, leaves item rows alone, twice is the same, absent keys keep, null clears', () async {
       await db.saveCustomFields('c1', {'serialNo': 'old', 'addCost': 1.0});
       final items = await db.select(db.collectionItems).get();
       final text = _file([
-        _row('c1', {'serialNo': null, 'eventDate': '2026-02-03T04:05:00', 'junk': 1}),
-        _row('dormant', {'addCost': 4.5}),
+        _row('c1', {'cf1': null, 'cf5': '2026-02-03T04:05:00', 'junk': 1}),
+        _row('dormant', {'cf3': 4.5}),
       ]);
       Future<void> doImport() async {
         final p = parseCustomFieldsFile(text, reg);
@@ -210,7 +210,7 @@ void main() {
       await db.saveCustomFields('c1', {'serialNo': 'keep'});
       final before = await snapshot();
       final p = parseCustomFieldsFile(
-        _file([_row('c1', {'serialNo': 'new'}), _row('x', {'addCost': 'bad'})]),
+        _file([_row('c1', {'cf1': 'new'}), _row('x', {'cf3': 'bad'})]),
         reg,
       );
       expect(p.rows, isNull);
@@ -226,7 +226,7 @@ void main() {
         ('{nope', 'Custom field import refused: the file is not valid JSON'),
         (_file([], version: 2), 'Custom field import refused: unknown format version 2'),
         (
-          _file([_row('c1', {'serialNo': 'new'}), _row('x', {'addCost': 'bad'})]),
+          _file([_row('c1', {'cf1': 'new'}), _row('x', {'cf3': 'bad'})]),
           'Custom field import refused: row 2 field addCost does not fit its real type',
         ),
       ];
@@ -234,7 +234,7 @@ void main() {
         expect(await importCustomFieldsText(db, text, reg), msg);
         expect(await snapshot(), before);
       }
-      final ok = _file([_row('c1', {'serialNo': 'new'}), _row('x', {'addCost': 2.5})]);
+      final ok = _file([_row('c1', {'cf1': 'new'}), _row('x', {'cf3': 2.5})]);
       expect(await importCustomFieldsText(db, ok, reg), 'Imported 2 custom field row(s)');
       final rows = await db.overrideRows();
       expect(rows.map((r) => r.importedId), ['c1', 'x']);
