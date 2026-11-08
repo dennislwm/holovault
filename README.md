@@ -135,11 +135,19 @@ baseline from the current config.
 - Rename an entry: keeps its values, no counter change.
 - Delete an entry: its column and values stay in the database, hidden.
   Adding the id back with the same type restores them.
-- Change an entry's `type`: only `text` and `choice` can swap. Any other
-  change stops the generator (the rest of REQ-055 is built in slices).
+- Change an entry's `type`: `text` and `choice` swap freely. A change that
+  keeps every value converts the stored values on the next open: `bool` to
+  `text`, `choice` (`true`, `false`), `int` (1, 0) or `real` (1.0, 0.0);
+  `int` to `text`, `choice` or `real`; `real` to `text` or `choice`; `date` to
+  `text` or `choice` (the local day, `yyyy-MM-dd`). Any other change stops the
+  generator with a message. Use a new id, or accept it once with
+  `make gen-overrides ARGS="--accept <id>"`, which clears that field's values.
 - Change an `id`: stops the generator when a removed id and a new id share
   a name and type. To start a new field with that name, delete the entry and
-  run `make gen-overrides`, then add it back later.
+  run `make gen-overrides`, then add it back later, or run
+  `make gen-overrides ARGS="--accept <new id>"` to keep it as a new, empty field.
+- `--accept <id>` applies to that run only and is never saved. An id with
+  nothing to accept stops the generator.
 
 ## Maintainer setup
 

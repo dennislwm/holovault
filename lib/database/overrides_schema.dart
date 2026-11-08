@@ -72,7 +72,7 @@ typedef CustomColumn = ({int? id, String name, CustomColumnType type, Object? Fu
 // counter and this one.
 const overrideCounter = 0;
 
-const overrideSteps = <({int id, String kind, String type})>[
+const overrideSteps = <({int id, String kind, String type, String from, bool clear})>[
 ];
 
 /// The overrides-table column of config id [id], live or removed; null if none.

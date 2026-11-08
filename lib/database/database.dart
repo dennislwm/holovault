@@ -2,9 +2,15 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../override_convert.dart';
 import 'overrides_schema.dart';
 
 part 'database.g.dart';
+
+/// REQ-055: one step of the generated `overrideSteps`. `type` is the type after
+/// the step, `from` the type before a `retype` (empty for `add`), `clear` true
+/// for a retype that empties the field.
+typedef OverrideStep = ({int id, String kind, String type, String from, bool clear});
 
 /// ADR-07, Option 3: thrown by [AppDatabase.migration] when the on-disk
 /// database's version has no matching migration branch -- a rollback to an
@@ -174,40 +180,78 @@ class AppDatabase extends _$AppDatabase {
   };
 
   /// REQ-055 (a): replays `steps[from..target)` on the overrides table, then
-  /// recreates the merged view and stores [target], all in one transaction.
-  /// An `add` step adds its column unless it exists; one that exists with a
-  /// different SQLite type fails loudly instead of being reused. Defaults are
+  /// recreates the merged view and stores [target], all in one transaction
+  /// (the view goes first, because a retype drops and renames the column it
+  /// selects). An `add` step adds its column unless it exists; one that exists
+  /// with a different SQLite type fails loudly instead of being reused. A
+  /// `retype` step replaces the column of its id by one of the new type,
+  /// converting each value (or leaving it empty when `clear`). Defaults are
   /// the generated steps; tests pass their own.
   Future<void> replayOverrideSteps({
     required int from,
     int target = overrideCounter,
-    List<({int id, String kind, String type})> steps = overrideSteps,
+    List<OverrideStep> steps = overrideSteps,
   }) => transaction(() async {
     final m = createMigrator();
     final table = collectionItemOverrides.actualTableName;
-    final have = {
-      for (final r in await customSelect('PRAGMA table_info($table)').get())
-        r.read<String>('name'): r.read<String>('type'),
-    };
+    await m.drop(mergedItems);
     for (final s in steps.sublist(from, target)) {
-      if (s.kind != 'add') {
-        throw StateError('unknown override step kind ${s.kind}');
-      }
-      final column = overrideColumn(collectionItemOverrides, s.id);
-      if (column == null) throw StateError('override step names unknown id ${s.id}');
-      final existing = have[column.name];
-      if (existing == null) {
-        await m.addColumn(collectionItemOverrides, column);
-      } else if (existing != _sqlAffinity(s.type)) {
-        throw StateError(
-          'override column ${column.name} exists as $existing, step wants ${s.type}',
-        );
+      final have = {
+        for (final r in await customSelect('PRAGMA table_info($table)').get())
+          r.read<String>('name'): r.read<String>('type'),
+      };
+      switch (s.kind) {
+        case 'add':
+          final column = overrideColumn(collectionItemOverrides, s.id);
+          if (column == null) throw StateError('override step names unknown id ${s.id}');
+          final existing = have[column.name];
+          if (existing == null) {
+            await m.addColumn(collectionItemOverrides, column);
+          } else if (existing != _sqlAffinity(s.type)) {
+            throw StateError(
+              'override column ${column.name} exists as $existing, step wants ${s.type}',
+            );
+          }
+        case 'retype':
+          await _retypeColumn(table, s, have);
+        default:
+          throw StateError('unknown override step kind ${s.kind}');
       }
     }
-    await m.drop(mergedItems);
     await m.createView(mergedItems);
     await customStatement('UPDATE $_counterTable SET value = $target');
   });
+
+  /// One `retype` step: add `cf<id>_new` of the new type, copy every non-null
+  /// value through [convertOverrideValue] (none when the step clears), drop the
+  /// old column, rename the new one to `cf<id>`. Runs inside the caller's
+  /// transaction, with the merged view already dropped.
+  Future<void> _retypeColumn(
+    String table,
+    OverrideStep s,
+    Map<String, String> have,
+  ) async {
+    final col = 'cf${s.id}';
+    final tmp = '${col}_new';
+    if (!have.containsKey(col)) throw StateError('retype of missing column $col');
+    final check = s.type == 'bool' ? ' CHECK ($tmp IN (0, 1))' : '';
+    await customStatement(
+      'ALTER TABLE $table ADD COLUMN $tmp ${_sqlAffinity(s.type)} NULL$check',
+    );
+    if (!s.clear) {
+      final rows = await customSelect(
+        'SELECT imported_id, $col AS v FROM $table WHERE $col IS NOT NULL',
+      ).get();
+      for (final r in rows) {
+        await customStatement(
+          'UPDATE $table SET $tmp = ? WHERE imported_id = ?',
+          [convertOverrideValue(r.data['v'], s.from, s.type), r.read<String>('imported_id')],
+        );
+      }
+    }
+    await customStatement('ALTER TABLE $table DROP COLUMN $col');
+    await customStatement('ALTER TABLE $table RENAME COLUMN $tmp TO $col');
+  }
 
   Future<void> _ensureCounterTable() => customStatement(
     'CREATE TABLE IF NOT EXISTS $_counterTable (value INTEGER NOT NULL)',

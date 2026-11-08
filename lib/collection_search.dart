@@ -5,6 +5,7 @@ import 'package:local_query_filter/local_query_filter.dart';
 import 'annualized_return.dart';
 import 'database/database.dart';
 import 'database/overrides_schema.dart';
+import 'override_convert.dart';
 import 'set_lookup.dart';
 
 /// ADR-18, Option 2: fields an ad hoc clause can target.
@@ -397,13 +398,8 @@ Comparable? customSortValue(CustomColumn c, MergedItem item) {
   } as Comparable?;
 }
 
-String _two(int n) => n.toString().padLeft(2, '0');
-
 /// Local calendar date as yyyy-MM-dd (the cell text and the clause value).
-String formatDay(DateTime d) {
-  final l = d.toLocal();
-  return '${l.year.toString().padLeft(4, '0')}-${_two(l.month)}-${_two(l.day)}';
-}
+String formatDay(DateTime d) => formatLocalDay(d);
 
 /// Row cell text of a custom column; a date is the calendar date only.
 String? customCellText(CustomColumn c, MergedItem item) {

@@ -56,7 +56,7 @@ void main() {
           reason: 'text to $to',
         );
       }
-      expect(() => _plan([_e(1, 'a'), _e(2, 'b', 'text')], base), throwsArgumentError);
+      expect(() => _plan([_e(1, 'a'), _e(2, 'b', 'int')], base), throwsArgumentError);
     });
 
     test('a removed id keeps its name and type, with no step and no bump', () {
@@ -119,7 +119,7 @@ void main() {
       final snap = _plan(entries, _plan([_e(1, 'a')]));
       final out = generateOverridesSchema(entries, snap);
       expect(out, contains('const overrideCounter = 1;'));
-      expect(out, contains("(id: 3, kind: 'add', type: 'date'),"));
+      expect(out, contains("(id: 3, kind: 'add', type: 'date', from: '', clear: false),"));
     });
   });
 
@@ -155,7 +155,7 @@ void main() {
       await db.close();
     }
 
-    const step = [(id: 6, kind: 'add', type: 'choice')];
+    const step = [(id: 6, kind: 'add', type: 'choice', from: '', clear: false)];
 
     test('an add step adds the column, rebuilds the view, stores the counter, keeps values', () async {
       await storeWithoutCf6();
@@ -194,7 +194,10 @@ void main() {
         db.replayOverrideSteps(
           from: 0,
           target: 2,
-          steps: const [(id: 5, kind: 'add', type: 'date'), (id: 6, kind: 'add', type: 'choice')],
+          steps: const [
+            (id: 5, kind: 'add', type: 'date', from: '', clear: false),
+            (id: 6, kind: 'add', type: 'choice', from: '', clear: false),
+          ],
         ),
         throwsA(isA<StateError>()),
       );

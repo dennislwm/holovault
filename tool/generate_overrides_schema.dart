@@ -58,7 +58,45 @@ void validateEntries(List<Map<String, dynamic>> entries) {
 // A type change between these two needs no physical change (same column).
 const _swappable = {'text', 'choice'};
 
+/// REQ-055 (b): the type changes that keep every stored value, by old type.
+/// Anything else is refused unless the id is accepted (which clears it).
+const _lossless = {
+  'bool': {'text', 'choice', 'int', 'real'},
+  'int': {'text', 'choice', 'real'},
+  'real': {'text', 'choice'},
+  'date': {'text', 'choice'},
+};
+
 Map<String, dynamic> _plain(Object? m) => Map<String, dynamic>.from(m as Map);
+
+/// The step for a type change on id [k], or null when the snapshot alone
+/// changes (same type, or a text/choice swap). A lossless pair is a `retype`
+/// that converts; any other pair throws, unless [k] is accepted, which makes
+/// it a `retype` that clears the field's values (and marks it in [used]).
+Map<String, dynamic>? _typeChange(
+  String k,
+  String from,
+  String to,
+  Set<int> accept,
+  Set<int> used,
+) {
+  if (from == to || (_swappable.contains(from) && _swappable.contains(to))) {
+    return null;
+  }
+  final id = int.parse(k);
+  if (_lossless[from]?.contains(to) ?? false) {
+    return {'id': id, 'kind': 'retype', 'from': from, 'to': to, 'clear': false};
+  }
+  if (accept.contains(id)) {
+    used.add(id);
+    return {'id': id, 'kind': 'retype', 'from': from, 'to': to, 'clear': true};
+  }
+  throw ArgumentError(
+    'overrides_config.json: id $k changed type from $from to $to, which cannot '
+    'keep its stored values. Change it back, use a new id, or run '
+    '`make gen-overrides ARGS="--accept $k"` to clear that field\'s values',
+  );
+}
 
 /// REQ-055 (a), (b), (d), (e): the next snapshot from the config and the
 /// previous snapshot (null = first run: the current config is the baseline,
@@ -66,14 +104,20 @@ Map<String, dynamic> _plain(Object? m) => Map<String, dynamic>.from(m as Map);
 /// and type, a map of removed ids to their last name and type, and the ordered
 /// steps (step N is counter N). A new id appends an `add` step and bumps the
 /// counter; a rename, a removal, a restore of a removed id with its type, and
-/// a text/choice swap change the snapshot only. Any other type change, and an
-/// id edit (a removed id and a new id with the same name and type), throw.
+/// a text/choice swap change the snapshot only. A lossless type change appends
+/// a converting `retype` step. Any other type change, and an id edit (a removed
+/// id and a new id with the same name and type), throw, unless the id is in
+/// [accept] (the `--accept` flag): then the retype clears the field, and the
+/// id edit becomes a new empty field. An accepted id with nothing to accept
+/// throws, so a typo cannot pass silently.
 /// Pure; the caller writes the file only after this returns.
 Map<String, dynamic> planSnapshot(
   List<Map<String, dynamic>> entries,
-  Map<String, dynamic>? previous,
-) {
+  Map<String, dynamic>? previous, {
+  Set<int> accept = const {},
+}) {
   validateEntries(entries);
+  final used = <int>{};
   final cols = <String, Map<String, dynamic>>{};
   final removed = <String, Map<String, dynamic>>{};
   final steps = <Map<String, dynamic>>[];
@@ -101,12 +145,10 @@ Map<String, dynamic> planSnapshot(
       final type = e['type'] as String;
       final prior = cols[k] ?? removed[k];
       if (prior != null) {
-        final was = prior['type'] as String;
-        if (was != type && !(_swappable.contains(was) && _swappable.contains(type))) {
-          throw ArgumentError(
-            'overrides_config.json: id $k changed type from $was to $type; '
-            'only text and choice can swap so far (REQ-055 retype is not built yet)',
-          );
+        final step = _typeChange(k, prior['type'] as String, type, accept, used);
+        if (step != null) {
+          steps.add(step);
+          counter++;
         }
         removed.remove(k);
       } else {
@@ -117,10 +159,16 @@ Map<String, dynamic> planSnapshot(
     for (final MapEntry(key: ok, value: o) in gone.entries) {
       for (final MapEntry(key: nk, value: n) in fresh.entries) {
         if (o['name'] == n['name'] && o['type'] == n['type']) {
+          if (accept.contains(int.parse(nk))) {
+            used.add(int.parse(nk));
+            continue;
+          }
           throw ArgumentError(
             'overrides_config.json: id $ok is gone and id $nk has the same name '
             'and type; an id cannot be edited. To start a new field with that '
-            'name, delete the entry and run the generator, then add it back later',
+            'name, delete the entry and run the generator, then add it back '
+            'later, or run `make gen-overrides ARGS="--accept $nk"` to keep id '
+            '$nk as a new, empty field',
           );
         }
       }
@@ -129,6 +177,12 @@ Map<String, dynamic> planSnapshot(
       steps.add({'id': int.parse(k), 'kind': 'add', 'type': e['type']});
       counter++;
     }
+  }
+  final unused = accept.difference(used);
+  if (unused.isNotEmpty) {
+    throw ArgumentError(
+      '--accept ${unused.join(', ')} names no rejected change; nothing was written',
+    );
   }
   Map<String, dynamic> byId(Map<String, Map<String, dynamic>> m) => {
         for (final k in (m.keys.toList()..sort((a, b) => int.parse(a).compareTo(int.parse(b)))))
@@ -158,7 +212,24 @@ const _collectionItemsColumns = [
   'pricechartingId', 'doubleholoId', 'dateAdded', 'tag',
 ];
 
-void main() {
+/// `--accept <id>` (repeatable): the ids whose rejected change this run
+/// accepts. Anything else on the command line is an error.
+Set<int> parseAccept(List<String> args) {
+  final out = <int>{};
+  for (var i = 0; i < args.length; i++) {
+    final id = args[i] == '--accept' && i + 1 < args.length
+        ? int.tryParse(args[++i])
+        : null;
+    if (id == null || id < 1) {
+      throw ArgumentError('usage: generate_overrides_schema.dart [--accept <id>]...');
+    }
+    out.add(id);
+  }
+  return out;
+}
+
+void main(List<String> args) {
+  final accept = parseAccept(args);
   final configFile = File('overrides_config.json');
   final config = configFile.existsSync()
       ? jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>
@@ -172,7 +243,7 @@ void main() {
   final previous = snapshotFile.existsSync()
       ? jsonDecode(snapshotFile.readAsStringSync()) as Map<String, dynamic>
       : null;
-  final snapshot = planSnapshot(extraColumns, previous);
+  final snapshot = planSnapshot(extraColumns, previous, accept: accept);
   final source = generateOverridesSchema(extraColumns, snapshot);
 
   File('lib/database/overrides_schema.dart').writeAsStringSync(source);
@@ -225,7 +296,9 @@ String generateOverridesSchema(
 
   final stepLines = (snap['steps'] as List).map((s) {
     final m = _plain(s);
-    return "  (id: ${m['id']}, kind: '${m['kind']}', type: '${m['type']}'),";
+    // `type` is the type after the step; `from` is the type before a retype.
+    return "  (id: ${m['id']}, kind: '${m['kind']}', type: '${m['to'] ?? m['type']}', "
+        "from: '${m['from'] ?? ''}', clear: ${m['clear'] ?? false}),";
   }).join('\n');
 
   final columnSwitch = [
@@ -288,7 +361,7 @@ String generateOverridesSchema(
     ..writeln('// counter and this one.')
     ..writeln('const overrideCounter = ${snap['counter']};')
     ..writeln()
-    ..writeln('const overrideSteps = <({int id, String kind, String type})>[')
+    ..writeln('const overrideSteps = <({int id, String kind, String type, String from, bool clear})>[')
     ..write(stepLines.isEmpty ? '' : '$stepLines\n')
     ..writeln('];')
     ..writeln()

@@ -49,6 +49,7 @@ help:
 	@echo "                Requires: setup"
 	@echo "                Run after editing overrides_config.json; also writes"
 	@echo "                overrides_snapshot.json (commit it, do not edit it)"
+	@echo "                ARGS: --accept <id> accepts that id's rejected change once"
 	@echo ""
 
 setup:
@@ -87,7 +88,7 @@ check-pins:
 	@source ./make.sh && check_pins
 
 gen-overrides:
-	dart run tool/generate_overrides_schema.dart
+	dart run tool/generate_overrides_schema.dart $(ARGS)
 	flutter pub run build_runner build --delete-conflicting-outputs
 
 clean:
