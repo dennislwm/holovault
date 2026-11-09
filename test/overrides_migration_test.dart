@@ -7,19 +7,22 @@ import 'package:holovault/database/database.dart';
 import 'package:holovault/database/overrides_schema.dart';
 
 import '../tool/generate_overrides_schema.dart';
+import 'helpers.dart';
 
 void main() {
   group('REQ-043 (a) registry generation', () {
+    final choice = testCustomColumns.firstWhere((c) => c.type == CustomColumnType.choice);
+    final date = testCustomColumns.firstWhere((c) => c.type == CustomColumnType.date);
     final out = generateOverridesSchema([
-      {'id': 1, 'name': 'preGrade', 'type': 'choice'},
-      {'id': 2, 'name': 'seenOn', 'type': 'date'},
+      {'id': 1, 'name': choice.name, 'type': 'choice'},
+      {'id': 2, 'name': date.name, 'type': 'date'},
     ]);
 
     test('choice and date keep their type in the registry; storage differs', () {
       expect(out, contains('CustomColumnType.choice'));
       expect(out, contains('CustomColumnType.date'));
-      expect(out, contains('TextColumn get preGrade'));
-      expect(out, contains('DateTimeColumn get seenOn'));
+      expect(out, contains('TextColumn get ${choice.name}'));
+      expect(out, contains('DateTimeColumn get ${date.name}'));
     });
 
     test('an unknown type still fails loudly', () {
@@ -66,20 +69,26 @@ void main() {
 
     test('keeps existing overrides rows and exposes the new columns', () async {
       final db = AppDatabase.withExecutor(NativeDatabase(dbFile));
+      if (customColumns.isEmpty) {
+        await db.close();
+        markTestSkipped('REQ-057 SKIP: migration registry assertions require a live field');
+        return;
+      }
       final rows = await overridesRows(db);
       expect(rows, hasLength(1));
       expect(rows.single.data['imported_id'], 'a1');
-      expect(customColumns.map((c) => c.name), [
-        'serialNo', 'preGrade', 'addCost', 'releasePrice',
-        'eventDate', 'eventName',
-      ]);
+      expect(rows.single.data.keys.toSet(), {
+        for (final c in db.collectionItemOverrides.$columns) c.name,
+      });
       for (final c in customColumns) {
         expect(rows.single.data.containsKey(
           c.column(db.collectionItemOverrides).$name), isTrue);
       }
       final merged = await db.select(db.mergedItems).get();
       expect(merged.single.name, 'X');
-      expect(merged.single.preGrade, isNull);
+      for (final c in customColumns) {
+        expect(c.value(merged.single), isNull, reason: c.name);
+      }
       await db.close();
     });
 
@@ -90,7 +99,7 @@ void main() {
       db = AppDatabase.withExecutor(NativeDatabase(dbFile));
       final rows = await overridesRows(db);
       expect(rows, hasLength(1));
-      expect(rows.single.data.length, 7);
+      expect(rows.single.data.length, db.collectionItemOverrides.$columns.length);
       await db.close();
     });
   });

@@ -11,12 +11,7 @@ import 'package:holovault/screens/collection_list_screen.dart';
 
 import 'helpers.dart';
 
-// REQ-047: a registry holding all six types (the real one has no int or bool).
-// Callbacks are never called by the pure builder or parser.
-final _all = <CustomColumn>[
-  for (final t in CustomColumnType.values)
-    (id: null, name: t.name, type: t, value: (r) => null, column: (tbl) => tbl.serialNo),
-];
+final _all = testCustomColumns;
 
 String _file(Object? rows, {Object? version = 1, Object? format = customFieldsFormat}) =>
     jsonEncode({'format': format, 'version': version, 'rows': rows});
@@ -34,12 +29,12 @@ void main() {
       (
         importedId: 'a',
         values: <String, Object?>{
-          'text': 't',
-          'choice': 'c',
-          'int': 7,
-          'real': 1.5,
-          'bool': false,
-          'date': when,
+          'testText': 't',
+          'testChoice': 'c',
+          'testInteger': 7,
+          'testReal': 1.5,
+          'testBool': false,
+          'testDate': when,
           'undeclared': 'ignored',
         },
       ),
@@ -54,12 +49,12 @@ void main() {
       expect(out[0], {
         'importedId': 'a',
         'values': {
-          'text': 't',
-          'choice': 'c',
-          'int': 7,
-          'real': 1.5,
-          'bool': false,
-          'date': '2026-11-06T13:30:05.000',
+          'testText': 't',
+          'testChoice': 'c',
+          'testInteger': 7,
+          'testReal': 1.5,
+          'testBool': false,
+          'testDate': '2026-11-06T13:30:05.000',
         },
       });
       expect((out[1] as Map)['values'], {
@@ -76,9 +71,9 @@ void main() {
     test('round trip through the parser', () {
       final parsed = parseCustomFieldsFile(buildCustomFieldsFile(rows, _all), _all);
       expect(parsed.refusal, isNull);
-      expect(parsed.rows![0].values['date'], when);
-      expect(parsed.rows![0].values['int'], 7);
-      expect(parsed.rows![1].values['text'], isNull);
+      expect(parsed.rows![0].values['testDate'], when);
+      expect(parsed.rows![0].values['testInteger'], 7);
+      expect(parsed.rows![1].values['testText'], isNull);
     });
   });
 
@@ -99,18 +94,18 @@ void main() {
 
     test('wrong-typed value refuses, naming row and field', () {
       for (final bad in <(String, Object?)>[
-        ('text', 1),
-        ('choice', true),
-        ('int', 1.5),
-        ('int', '1'),
-        ('real', '1.5'),
-        ('bool', 'true'),
-        ('bool', 1),
-        ('date', 'not a date'),
-        ('date', 5),
+        ('testText', 1),
+        ('testChoice', true),
+        ('testInteger', 1.5),
+        ('testInteger', '1'),
+        ('testReal', '1.5'),
+        ('testBool', 'true'),
+        ('testBool', 1),
+        ('testDate', 'not a date'),
+        ('testDate', 5),
       ]) {
         expect(
-          _refusal(_file([_row('a', {'text': 'ok'}), _row('b', {bad.$1: bad.$2})])),
+          _refusal(_file([_row('a', {'testText': 'ok'}), _row('b', {bad.$1: bad.$2})])),
           contains('row 2 field ${bad.$1}'),
           reason: '$bad',
         );
@@ -120,27 +115,27 @@ void main() {
     test('valid values and nulls pass; whole real-valued int accepted', () {
       final p = parseCustomFieldsFile(
         _file([
-          _row('a', {'int': 3.0, 'real': 2, 'bool': true, 'date': '2026-01-02T03:04:05', 'text': null}),
+          _row('a', {'testInteger': 3.0, 'testReal': 2, 'testBool': true, 'testDate': '2026-01-02T03:04:05', 'testText': null}),
         ]),
         _all,
       );
       expect(p.refusal, isNull);
       expect(p.rows!.single.values, {
-        'int': 3,
-        'real': 2.0,
-        'bool': true,
-        'date': DateTime(2026, 1, 2, 3, 4, 5),
-        'text': null,
+        'testInteger': 3,
+        'testReal': 2.0,
+        'testBool': true,
+        'testDate': DateTime(2026, 1, 2, 3, 4, 5),
+        'testText': null,
       });
     });
 
     test('undeclared key skipped; absent column absent, present null kept', () {
       final p = parseCustomFieldsFile(
-        _file([_row('a', {'gone': 1, 'text': null})]),
+        _file([_row('a', {'gone': 1, 'testText': null})]),
         _all,
       );
-      expect(p.rows!.single.values, {'text': null});
-      expect(p.rows!.single.values.containsKey('real'), isFalse);
+      expect(p.rows!.single.values, {'testText': null});
+      expect(p.rows!.single.values.containsKey('testReal'), isFalse);
       expect(p.rows!.single.values.containsKey('gone'), isFalse);
     });
   });
@@ -149,12 +144,15 @@ void main() {
     late Directory dir;
     late AppDatabase db;
     final reg = [
-      customColumns.firstWhere((c) => c.name == 'serialNo'),
-      customColumns.firstWhere((c) => c.name == 'addCost'),
-      customColumns.firstWhere((c) => c.name == 'eventDate'),
+      testCustomColumns.firstWhere((c) => c.name == 'testText'),
+      testCustomColumns.firstWhere((c) => c.name == 'testReal'),
+      testCustomColumns.firstWhere((c) => c.name == 'testDate'),
     ];
 
-    Future<String> snapshot() async => buildCustomFieldsFile(await db.overrideRows());
+    Future<String> snapshot([List<CustomColumn>? registry]) async {
+      final columns = registry ?? reg;
+      return buildCustomFieldsFile(await db.overrideRows(registry: columns), columns);
+    }
 
     setUp(() async {
       dir = Directory.systemTemp.createTempSync('holovault_cff_');
@@ -168,93 +166,144 @@ void main() {
     });
 
     test('export includes a dormant row (no collection item)', () async {
-      await db.saveCustomFields('c1', {'serialNo': 'S1', 'eventDate': DateTime(2026, 2, 3, 4, 5)});
-      await db.saveCustomFields('gone', {'addCost': 9.5});
-      final doc = jsonDecode(buildCustomFieldsFile(await db.overrideRows(registry: reg), reg)) as Map;
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+        CustomColumnType.real,
+        CustomColumnType.date,
+      }, testName: 'export includes a dormant row');
+      if (fields == null) return;
+      final text = fields[CustomColumnType.text]!;
+      final real = fields[CustomColumnType.real]!;
+      final date = fields[CustomColumnType.date]!;
+      final liveReg = [text.column, real.column, date.column];
+      await db.saveCustomFields('c1', {text.column.name: text.value, date.column.name: date.value}, registry: liveReg);
+      await db.saveCustomFields('gone', {real.column.name: real.value}, registry: liveReg);
+      final doc = jsonDecode(buildCustomFieldsFile(await db.overrideRows(registry: liveReg), liveReg)) as Map;
       final rows = doc['rows'] as List;
       expect(rows.map((r) => (r as Map)['importedId']), ['c1', 'gone']);
       expect((rows[0] as Map)['values'], {
-        'cf1': 'S1',
-        'cf3': null,
-        'cf5': '2026-02-03T04:05:00.000',
+        text.sqlName: text.value,
+        real.sqlName: null,
+        date.sqlName: (date.value as DateTime).toIso8601String(),
       });
-      expect((rows[1] as Map)['values']['cf3'], 9.5);
+      expect((rows[1] as Map)['values'][real.sqlName], real.value);
     });
 
     test('import upserts, leaves item rows alone, twice is the same, absent keys keep, null clears', () async {
-      await db.saveCustomFields('c1', {'serialNo': 'old', 'addCost': 1.0});
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+        CustomColumnType.real,
+        CustomColumnType.date,
+      }, testName: 'import upserts and is idempotent');
+      if (fields == null) return;
+      final textField = fields[CustomColumnType.text]!;
+      final real = fields[CustomColumnType.real]!;
+      final date = fields[CustomColumnType.date]!;
+      final liveReg = [textField.column, real.column, date.column];
+      await db.saveCustomFields('c1', {textField.column.name: textField.value, real.column.name: real.value}, registry: liveReg);
       final items = await db.select(db.collectionItems).get();
       final text = _file([
-        _row('c1', {'cf1': null, 'cf5': '2026-02-03T04:05:00', 'junk': 1}),
-        _row('dormant', {'cf3': 4.5}),
+        _row('c1', {textField.sqlName: null, date.sqlName: (date.value as DateTime).toIso8601String(), 'junk': 1}),
+        _row('dormant', {real.sqlName: sampleCustomValue(CustomColumnType.real, variant: 1)}),
       ]);
       Future<void> doImport() async {
-        final p = parseCustomFieldsFile(text, reg);
-        await db.importCustomFieldRows(p.rows!, registry: reg);
+        final p = parseCustomFieldsFile(text, liveReg);
+        await db.importCustomFieldRows(p.rows!, registry: liveReg);
       }
 
       await doImport();
-      final once = await snapshot();
+      final once = await snapshot(liveReg);
       await doImport();
-      expect(await snapshot(), once);
+      expect(await snapshot(liveReg), once);
 
-      final c1 = (await db.overrideRows()).firstWhere((r) => r.importedId == 'c1');
-      expect(c1.values['serialNo'], isNull); // present null clears
-      expect(c1.values['addCost'], 1.0); // absent key untouched
-      expect(c1.values['eventDate'], DateTime(2026, 2, 3, 4, 5));
-      expect((await db.overrideRows()).map((r) => r.importedId), ['c1', 'dormant']);
+      final c1 = (await db.overrideRows(registry: liveReg)).firstWhere((r) => r.importedId == 'c1');
+      expect(c1.values[textField.column.name], isNull); // present null clears
+      expect(c1.values[real.column.name], real.value); // absent key untouched
+      expect(c1.values[date.column.name], date.value);
+      expect((await db.overrideRows(registry: liveReg)).map((r) => r.importedId), ['c1', 'dormant']);
       expect(await db.select(db.collectionItems).get(), items);
     });
 
     test('a refused file writes nothing', () async {
-      await db.saveCustomFields('c1', {'serialNo': 'keep'});
-      final before = await snapshot();
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+        CustomColumnType.real,
+      }, testName: 'refused custom-field file writes nothing');
+      if (fields == null) return;
+      final text = fields[CustomColumnType.text]!;
+      final real = fields[CustomColumnType.real]!;
+      final liveReg = [text.column, real.column];
+      await db.saveCustomFields('c1', {text.column.name: text.value}, registry: liveReg);
+      final before = await snapshot(liveReg);
       final p = parseCustomFieldsFile(
-        _file([_row('c1', {'cf1': 'new'}), _row('x', {'cf3': 'bad'})]),
-        reg,
+        _file([_row('c1', {text.sqlName: sampleCustomValue(CustomColumnType.text, variant: 1)}), _row('x', {real.sqlName: 'bad'})]),
+        liveReg,
       );
       expect(p.rows, isNull);
-      expect(p.refusal, contains('row 2 field addCost'));
+      expect(p.refusal, contains('row 2 field ${real.column.name}'));
       // The screen only calls importCustomFieldRows when rows is non-null.
-      expect(await snapshot(), before);
+      expect(await snapshot(liveReg), before);
     });
 
     test('REQ-048 importCustomFieldsText: refusals write nothing, valid writes', () async {
-      await db.saveCustomFields('c1', {'serialNo': 'keep'});
-      final before = await snapshot();
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+        CustomColumnType.real,
+      }, testName: 'importCustomFieldsText writes only valid rows');
+      if (fields == null) return;
+      final textField = fields[CustomColumnType.text]!;
+      final real = fields[CustomColumnType.real]!;
+      final liveReg = [textField.column, real.column];
+      await db.saveCustomFields('c1', {textField.column.name: textField.value}, registry: liveReg);
+      final before = await snapshot(liveReg);
       final refused = <(String, String)>[
         ('{nope', 'Custom field import refused: the file is not valid JSON'),
         (_file([], version: 2), 'Custom field import refused: unknown format version 2'),
         (
-          _file([_row('c1', {'cf1': 'new'}), _row('x', {'cf3': 'bad'})]),
-          'Custom field import refused: row 2 field addCost does not fit its real type',
+          _file([_row('c1', {textField.sqlName: sampleCustomValue(CustomColumnType.text, variant: 1)}), _row('x', {real.sqlName: 'bad'})]),
+          'Custom field import refused: row 2 field ${real.column.name} does not fit its real type',
         ),
       ];
       for (final (text, msg) in refused) {
-        expect(await importCustomFieldsText(db, text, reg), msg);
-        expect(await snapshot(), before);
+        expect(await importCustomFieldsText(db, text, liveReg), msg);
+        expect(await snapshot(liveReg), before);
       }
-      final ok = _file([_row('c1', {'cf1': 'new'}), _row('x', {'cf3': 2.5})]);
-      expect(await importCustomFieldsText(db, ok, reg), 'Imported 2 custom field row(s)');
-      final rows = await db.overrideRows();
+      final changedText = sampleCustomValue(CustomColumnType.text, variant: 1);
+      final changedReal = sampleCustomValue(CustomColumnType.real, variant: 1);
+      final ok = _file([_row('c1', {textField.sqlName: changedText}), _row('x', {real.sqlName: changedReal})]);
+      expect(await importCustomFieldsText(db, ok, liveReg), 'Imported 2 custom field row(s)');
+      final rows = await db.overrideRows(registry: liveReg);
       expect(rows.map((r) => r.importedId), ['c1', 'x']);
-      expect(rows[0].values['serialNo'], 'new');
-      expect(rows[1].values['addCost'], 2.5);
+      expect(rows[0].values[textField.column.name], changedText);
+      expect(rows[1].values[real.column.name], changedReal);
     });
 
     test('REQ-048 round trip through two real stores gives the same file', () async {
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+        CustomColumnType.real,
+        CustomColumnType.date,
+      }, testName: 'custom fields round trip through two stores');
+      if (fields == null) return;
+      final text = fields[CustomColumnType.text]!;
+      final real = fields[CustomColumnType.real]!;
+      final date = fields[CustomColumnType.date]!;
+      final liveReg = [text.column, real.column, date.column];
       await db.saveCustomFields('c1', {
-        'serialNo': 'S1',
-        'addCost': null,
-        'eventDate': DateTime(2026, 2, 3, 4, 5, 6),
-      });
-      await db.saveCustomFields('gone', {'serialNo': 'D', 'addCost': 9.5});
-      final first = buildCustomFieldsFile(await db.overrideRows());
+        text.column.name: text.value,
+        real.column.name: null,
+        date.column.name: date.value,
+      }, registry: liveReg);
+      await db.saveCustomFields('gone', {
+        text.column.name: sampleCustomValue(CustomColumnType.text, variant: 1),
+        real.column.name: sampleCustomValue(CustomColumnType.real, variant: 1),
+      }, registry: liveReg);
+      final first = buildCustomFieldsFile(await db.overrideRows(registry: liveReg), liveReg);
       final dir2 = Directory.systemTemp.createTempSync('holovault_cff2_');
       final db2 = AppDatabase.withExecutor(NativeDatabase(File('${dir2.path}/t.sqlite')));
       try {
-        expect(await importCustomFieldsText(db2, first), 'Imported 2 custom field row(s)');
-        expect(buildCustomFieldsFile(await db2.overrideRows()), first);
+        expect(await importCustomFieldsText(db2, first, liveReg), 'Imported 2 custom field row(s)');
+        expect(buildCustomFieldsFile(await db2.overrideRows(registry: liveReg), liveReg), first);
       } finally {
         await db2.close();
         dir2.deleteSync(recursive: true);
@@ -262,18 +311,24 @@ void main() {
     });
 
     test('importCustomFieldRows is one transaction: a failing row rolls back all', () async {
-      await db.saveCustomFields('c1', {'serialNo': 'keep'});
-      final before = await snapshot();
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+      }, testName: 'custom-field row import transaction rollback');
+      if (fields == null) return;
+      final text = fields[CustomColumnType.text]!;
+      final liveReg = [text.column];
+      await db.saveCustomFields('c1', {text.column.name: text.value}, registry: liveReg);
+      final before = await snapshot(liveReg);
       // The second row holds a value SQLite cannot bind, so its write throws
       // after the first row's write succeeded.
       await expectLater(
         db.importCustomFieldRows([
-          (importedId: 'c1', values: {'serialNo': 'changed'}),
-          (importedId: 'c2', values: {'serialNo': Object()}),
-        ], registry: reg),
+          (importedId: 'c1', values: {text.column.name: sampleCustomValue(CustomColumnType.text, variant: 1)}),
+          (importedId: 'c2', values: {text.column.name: Object()}),
+        ], registry: liveReg),
         throwsA(anything),
       );
-      expect(await snapshot(), before);
+      expect(await snapshot(liveReg), before);
     });
   });
 

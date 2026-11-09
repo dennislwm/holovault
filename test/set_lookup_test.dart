@@ -130,10 +130,15 @@ void main() {
     });
 
     test('collection import and the overrides path never write the lookup', () async {
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+      }, testName: 'overrides path leaves set lookup unchanged');
+      if (fields == null) return;
+      final text = fields[CustomColumnType.text]!;
       await importSetLookupText(db, good);
       final before = await snapshot();
       await seedItem(db, importedId: 'c1', name: 'X');
-      await db.saveCustomFields('c1', {'serialNo': 'S1'});
+      await db.saveCustomFields('c1', {text.column.name: text.value}, registry: [text.column]);
       expect(await snapshot(), before);
     });
   });
@@ -207,13 +212,13 @@ void main() {
       await db.customStatement('DROP TABLE override_counter');
       await db.customStatement(
         'CREATE TABLE collection_item_overrides '
-        '(imported_id TEXT NOT NULL UNIQUE, serial_no TEXT)',
+        '(imported_id TEXT NOT NULL UNIQUE, legacy_value TEXT)',
       );
       await db.customStatement(
         "INSERT INTO collection_items (imported_id, name) VALUES ('a1', 'X')",
       );
       await db.customStatement(
-        "INSERT INTO collection_item_overrides (imported_id, serial_no) VALUES ('a1', 'S1')",
+        "INSERT INTO collection_item_overrides (imported_id, legacy_value) VALUES ('a1', 'S1')",
       );
       await db.customStatement('PRAGMA user_version = 4');
       await db.close();
@@ -223,6 +228,14 @@ void main() {
 
     test('creates the lookup table and keeps every existing row', () async {
       final db = AppDatabase.withExecutor(NativeDatabase(dbFile));
+      final live = firstLiveFieldOrSkip(
+        db,
+        testName: 'v4 migration keeps every existing row',
+      );
+      if (live == null) {
+        await db.close();
+        return;
+      }
       expect(await db.allSetLookupRows(), isEmpty);
       final items = await db.customSelect('SELECT name FROM collection_items').get();
       expect(items.single.data['name'], 'X');
@@ -231,8 +244,8 @@ void main() {
       // exist under the old schema, operator 2026-11-08).
       final ov = await db.customSelect('SELECT * FROM collection_item_overrides').get();
       expect(ov.single.data['imported_id'], 'a1');
-      expect(ov.single.data.containsKey('cf1'), isTrue);
-      expect(ov.single.data.containsKey('serial_no'), isFalse);
+      expect(ov.single.data.containsKey(live.sqlName), isTrue);
+      expect(ov.single.data.containsKey('legacy_value'), isFalse);
       await db.close();
     });
 

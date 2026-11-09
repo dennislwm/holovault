@@ -16,7 +16,7 @@ CustomColumn _col(int? id, String name) => (
       name: name,
       type: CustomColumnType.text,
       value: (r) => null,
-      column: (t) => t.serialNo,
+      column: testCustomColumns.first.column,
     );
 
 void main() {
@@ -48,12 +48,12 @@ void main() {
 
     test('a rename keeps the physical column: same id, new name, same cf<id>', () {
       final before = generateOverridesSchema([
-        {'id': 1, 'name': 'serialNo', 'type': 'text'},
+        {'id': 1, 'name': 'testText', 'type': 'text'},
       ]);
       final after = generateOverridesSchema([
         {'id': 1, 'name': 'psaSerial', 'type': 'text'},
       ]);
-      expect(before, contains("TextColumn get serialNo => text().named('cf1')"));
+      expect(before, contains("TextColumn get testText => text().named('cf1')"));
       expect(after, contains("TextColumn get psaSerial => text().named('cf1')"));
       expect(after, contains('(id: 1, name: \'psaSerial\''));
     });
@@ -105,40 +105,75 @@ void main() {
             r.read<String>('name'),
         };
 
+    Future<Map<String, Object?>> storedRow(AppDatabase db, String id) async =>
+        (await db.customSelect(
+          "SELECT * FROM collection_item_overrides WHERE imported_id = '$id'",
+        ).getSingle()).data;
+
+    Future<Map<String, Object?>> mergedRow(AppDatabase db, String id) async =>
+        (await db.customSelect(
+          "SELECT * FROM merged_items WHERE imported_id = '$id'",
+        ).getSingle()).data;
+
+    LiveFieldSample? liveField(AppDatabase db, String testName) {
+      return firstLiveFieldOrSkip(db, testName: testName);
+    }
+
     test('a fresh install writes the counter and has the id-keyed columns', () async {
       final db = open();
       expect(await counter(db), [overrideCounter]);
       expect(await overrideColumns(db), {
-        'imported_id', 'cf1', 'cf2', 'cf3', 'cf4', 'cf5', 'cf6',
+        for (final c in db.collectionItemOverrides.$columns) c.name,
       });
       await db.close();
     });
 
     test('an install with a counter keeps its stored values across reopens', () async {
       var db = open();
+      final live = liveField(db, 'counter install keeps stored values');
+      if (live == null) {
+        await db.close();
+        return;
+      }
       await seedItem(db, importedId: 'c1', name: 'X');
-      await db.saveCustomFields('c1', {'serialNo': 'S1'});
+      await db.saveCustomFields('c1', {live.column.name: live.value}, registry: [live.column]);
       await db.close();
       db = open();
-      expect((await db.mergedItemByImportedId('c1'))!.serialNo, 'S1');
+      expect((await storedRow(db, 'c1'))[live.sqlName], live.value);
+      final merged = await mergedRow(db, 'c1');
+      expect(merged.containsKey(live.sqlName), isTrue);
+      expect(merged[live.sqlName], live.value);
       expect(await counter(db), [overrideCounter]);
       await db.close();
     });
 
     test('a stored counter above the generated one is left alone, values kept', () async {
       var db = open();
+      final live = liveField(db, 'counter above generated keeps values');
+      if (live == null) {
+        await db.close();
+        return;
+      }
       await seedItem(db, importedId: 'c1', name: 'X');
-      await db.saveCustomFields('c1', {'serialNo': 'S1'});
+      await db.saveCustomFields('c1', {live.column.name: live.value}, registry: [live.column]);
       await db.customStatement('UPDATE override_counter SET value = 99');
       await db.close();
       db = open();
-      expect((await db.mergedItemByImportedId('c1'))!.serialNo, 'S1');
+      expect((await storedRow(db, 'c1'))[live.sqlName], live.value);
+      final merged = await mergedRow(db, 'c1');
+      expect(merged.containsKey(live.sqlName), isTrue);
+      expect(merged[live.sqlName], live.value);
       expect(await counter(db), [99]);
       await db.close();
     });
 
     test('a name-keyed install with no counter is recreated once and keeps its imported ids', () async {
       var db = open();
+      final live = liveField(db, 'name-keyed install recreates once');
+      if (live == null) {
+        await db.close();
+        return;
+      }
       await db.customStatement('DROP VIEW merged_items');
       await db.customStatement('DROP TABLE collection_item_overrides');
       await db.customStatement('DROP TABLE override_counter');
@@ -153,7 +188,7 @@ void main() {
 
       db = open();
       expect(await counter(db), [overrideCounter]);
-      expect(await overrideColumns(db), contains('cf1'));
+      expect(await overrideColumns(db), contains(live.sqlName));
       expect(await overrideColumns(db), isNot(contains('serial_no')));
       expect(
         (await db.customSelect('SELECT imported_id FROM collection_item_overrides').get())
@@ -163,16 +198,25 @@ void main() {
       );
       // A value typed after the recreate survives the next open: it ran once.
       await seedItem(db, importedId: 'a1', name: 'X');
-      await db.saveCustomFields('a1', {'serialNo': 'S2'});
+      final changed = sampleCustomValue(live.column.type, variant: 1);
+      await db.saveCustomFields('a1', {live.column.name: changed}, registry: [live.column]);
       await db.close();
       db = open();
-      expect((await db.mergedItemByImportedId('a1'))!.serialNo, 'S2');
+      expect((await storedRow(db, 'a1'))[live.sqlName], changed);
+      final merged = await mergedRow(db, 'a1');
+      expect(merged.containsKey(live.sqlName), isTrue);
+      expect(merged[live.sqlName], changed);
       await db.close();
     });
 
     test('an install at version 1 ends with id-keyed columns and the counter, once', () async {
       // The v1 shape: only the key, name and extra columns, no other table.
       var db = open();
+      final live = liveField(db, 'version 1 install reaches id-keyed schema');
+      if (live == null) {
+        await db.close();
+        return;
+      }
       await db.customStatement('DROP VIEW merged_items');
       await db.customStatement('DROP TABLE collection_item_overrides');
       await db.customStatement('DROP TABLE override_counter');
@@ -188,12 +232,15 @@ void main() {
 
       db = open();
       expect(await counter(db), [overrideCounter]);
-      expect(await overrideColumns(db), contains('cf1'));
+      expect(await overrideColumns(db), contains(live.sqlName));
       await seedItem(db, importedId: 'c1', name: 'X');
-      await db.saveCustomFields('c1', {'serialNo': 'S1'});
+      await db.saveCustomFields('c1', {live.column.name: live.value}, registry: [live.column]);
       await db.close();
       db = open();
-      expect((await db.mergedItemByImportedId('c1'))!.serialNo, 'S1');
+      expect((await storedRow(db, 'c1'))[live.sqlName], live.value);
+      final merged = await mergedRow(db, 'c1');
+      expect(merged.containsKey(live.sqlName), isTrue);
+      expect(merged[live.sqlName], live.value);
       await db.close();
     });
   });

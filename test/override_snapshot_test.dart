@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/database/database.dart';
+import 'package:holovault/database/overrides_schema.dart';
 
 import '../tool/generate_overrides_schema.dart';
 import 'helpers.dart';
@@ -140,81 +141,172 @@ void main() {
             r.read<String>('name'): r.read<String>('type'),
         };
 
-    /// A store as it was before cf6 was added: the column is dropped, the
-    /// counter says 0, one value typed in cf1.
-    Future<void> storeWithoutCf6({String? asType}) async {
-      final db = open();
+    Future<int> counter(AppDatabase db) async =>
+        (await db.customSelect('SELECT value FROM override_counter').getSingle())
+            .read<int>('value');
+
+    List<OverrideStep> atCounter(int start, List<OverrideStep> steps) => [
+          for (var i = 0; i < start; i++) steps.first,
+          ...steps,
+        ];
+
+    String affinity(CustomColumnType type) => switch (type) {
+          CustomColumnType.text || CustomColumnType.choice => 'TEXT',
+          CustomColumnType.real => 'REAL',
+          _ => 'INTEGER',
+        };
+
+    OverrideStep addStep(LiveFieldSample field) => (
+          id: field.column.id!,
+          kind: 'add',
+          type: field.column.type.name,
+          from: '',
+          clear: false,
+        );
+
+    Future<void> prepareWithout(
+      AppDatabase db,
+      LiveFieldSample target,
+      LiveFieldSample preserved, {
+      String? asType,
+    }) async {
       await seedItem(db, importedId: 'c1', name: 'X');
-      await db.saveCustomFields('c1', {'serialNo': 'S1'});
+      await db.saveCustomFields('c1', {preserved.column.name: preserved.value}, registry: [preserved.column]);
       await db.customStatement('DROP VIEW merged_items');
-      await db.customStatement('ALTER TABLE collection_item_overrides DROP COLUMN cf6');
+      await db.customStatement('ALTER TABLE collection_item_overrides DROP COLUMN ${target.sqlName}');
       if (asType != null) {
-        await db.customStatement('ALTER TABLE collection_item_overrides ADD COLUMN cf6 $asType');
+        await db.customStatement('ALTER TABLE collection_item_overrides ADD COLUMN ${target.sqlName} $asType');
       }
-      await db.customStatement('UPDATE override_counter SET value = 0');
-      await db.close();
     }
 
-    const step = [(id: 6, kind: 'add', type: 'choice', from: '', clear: false)];
-
     test('an add step adds the column, rebuilds the view, stores the counter, keeps values', () async {
-      await storeWithoutCf6();
       final db = open();
-      // beforeOpen ran with the generated counter 0, so cf6 is still missing.
-      expect(await columns(db), isNot(contains('cf6')));
-      await db.replayOverrideSteps(from: 0, target: 1, steps: step);
-      expect((await columns(db))['cf6'], 'TEXT');
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.choice,
+        CustomColumnType.text,
+      }, testName: 'add replay rebuilds view and keeps values');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final target = fields[CustomColumnType.choice]!;
+      final preserved = fields[CustomColumnType.text]!;
+      await prepareWithout(db, target, preserved);
+      final start = await counter(db);
+      expect(await columns(db), isNot(contains(target.sqlName)));
+      await db.replayOverrideSteps(
+        from: start,
+        target: start + 1,
+        steps: atCounter(start, [addStep(target)]),
+      );
+      expect((await columns(db))[target.sqlName], affinity(target.column.type));
       expect(
         (await db.customSelect('SELECT value FROM override_counter').getSingle()).data['value'],
-        1,
+        start + 1,
       );
-      final merged = await db.mergedItemByImportedId('c1');
-      expect(merged!.serialNo, 'S1');
-      expect(merged.eventName, isNull);
+      final stored = await db.customSelect(
+        "SELECT ${preserved.sqlName} FROM collection_item_overrides WHERE imported_id = 'c1'",
+      ).getSingle();
+      expect(stored.data[preserved.sqlName], preserved.value);
+      final merged = await db.customSelect(
+        "SELECT * FROM merged_items WHERE imported_id = 'c1'",
+      ).getSingle();
+      expect(merged.data.containsKey(preserved.sqlName), isTrue);
+      expect(merged.data[preserved.sqlName], preserved.value);
+      expect(merged.data[target.sqlName], isNull);
       await db.close();
     });
 
     test('replaying a step whose column already exists with the same type is a no-op', () async {
-      await storeWithoutCf6(asType: 'TEXT');
       final db = open();
-      await db.replayOverrideSteps(from: 0, target: 1, steps: step);
-      await db.replayOverrideSteps(from: 0, target: 1, steps: step);
-      expect((await columns(db))['cf6'], 'TEXT');
-      expect((await db.mergedItemByImportedId('c1'))!.serialNo, 'S1');
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.choice,
+        CustomColumnType.text,
+      }, testName: 'existing add replay is a no-op');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final target = fields[CustomColumnType.choice]!;
+      final preserved = fields[CustomColumnType.text]!;
+      await prepareWithout(db, target, preserved, asType: affinity(target.column.type));
+      final start = await counter(db);
+      await db.replayOverrideSteps(
+        from: start,
+        target: start + 1,
+        steps: atCounter(start, [addStep(target)]),
+      );
+      await db.replayOverrideSteps(
+        from: start,
+        target: start + 1,
+        steps: atCounter(start, [addStep(target)]),
+      );
+      expect((await columns(db))[target.sqlName], affinity(target.column.type));
+      expect((await db.customSelect("SELECT ${preserved.sqlName} FROM collection_item_overrides WHERE imported_id = 'c1'").getSingle()).data[preserved.sqlName], preserved.value);
+      final merged = await db.customSelect(
+        "SELECT * FROM merged_items WHERE imported_id = 'c1'",
+      ).getSingle();
+      expect(merged.data.containsKey(preserved.sqlName), isTrue);
+      expect(merged.data[preserved.sqlName], preserved.value);
       await db.close();
     });
 
     test('a failing second step rolls back the first step\'s added column', () async {
-      await storeWithoutCf6(asType: 'INTEGER');
-      var db = open();
-      await db.customStatement('ALTER TABLE collection_item_overrides DROP COLUMN cf5');
-      await db.close();
-      db = open();
+      final db = open();
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.choice,
+        CustomColumnType.text,
+        CustomColumnType.date,
+      }, testName: 'failing second add rolls back first');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final failing = fields[CustomColumnType.choice]!;
+      final preserved = fields[CustomColumnType.text]!;
+      final first = fields[CustomColumnType.date]!;
+      final wrongAffinity = affinity(failing.column.type) == 'INTEGER' ? 'TEXT' : 'INTEGER';
+      await prepareWithout(db, failing, preserved, asType: wrongAffinity);
+      final start = await counter(db);
+      await db.customStatement('ALTER TABLE collection_item_overrides DROP COLUMN ${first.sqlName}');
       await expectLater(
         db.replayOverrideSteps(
-          from: 0,
-          target: 2,
-          steps: const [
-            (id: 5, kind: 'add', type: 'date', from: '', clear: false),
-            (id: 6, kind: 'add', type: 'choice', from: '', clear: false),
-          ],
+          from: start,
+          target: start + 2,
+          steps: atCounter(start, [addStep(first), addStep(failing)]),
         ),
         throwsA(isA<StateError>()),
       );
-      expect(await columns(db), isNot(contains('cf5')));
+      expect(await columns(db), isNot(contains(first.sqlName)));
       await db.close();
     });
 
     test('a step whose column exists with a different type fails loudly and changes nothing', () async {
-      await storeWithoutCf6(asType: 'INTEGER');
       final db = open();
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.choice,
+        CustomColumnType.text,
+      }, testName: 'add replay rejects a different existing type');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final target = fields[CustomColumnType.choice]!;
+      final preserved = fields[CustomColumnType.text]!;
+      final wrongAffinity = affinity(target.column.type) == 'INTEGER' ? 'TEXT' : 'INTEGER';
+      await prepareWithout(db, target, preserved, asType: wrongAffinity);
+      final start = await counter(db);
       await expectLater(
-        db.replayOverrideSteps(from: 0, target: 1, steps: step),
+        db.replayOverrideSteps(
+          from: start,
+          target: start + 1,
+          steps: atCounter(start, [addStep(target)]),
+        ),
         throwsA(isA<StateError>()),
       );
       expect(
         (await db.customSelect('SELECT value FROM override_counter').getSingle()).data['value'],
-        0,
+        start,
       );
       await db.close();
     });

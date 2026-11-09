@@ -2,23 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/collection_search.dart';
 import 'package:holovault/database/database.dart';
-import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/widgets/item_list_strip.dart';
 import 'package:holovault/widgets/item_row.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// REQ-043 (d): a registry holding every type, read from existing merged-row
-// fields (the real config declares only text, choice and real).
-final _registry = <CustomColumn>[
-  (id: null, name: 'tag', type: CustomColumnType.text, value: (r) => r.tag, column: (t) => t.serialNo),
-  (id: null, name: 'grade', type: CustomColumnType.choice, value: (r) => r.gradeSubtype, column: (t) => t.serialNo),
-  (id: null, name: 'qty', type: CustomColumnType.int, value: (r) => r.quantity, column: (t) => t.serialNo),
-  (id: null, name: 'cost', type: CustomColumnType.real, value: (r) => r.paidTotal, column: (t) => t.serialNo),
-  (id: null, name: 'wish', type: CustomColumnType.bool, value: (r) => r.groupWishlist, column: (t) => t.serialNo),
-  (id: null, name: 'when', type: CustomColumnType.date, value: (r) => r.dateAdded, column: (t) => t.serialNo),
-];
+import 'helpers.dart';
 
-MergedItem _item(int id, {String? tag, int? qty, double? cost, bool? wish, DateTime? when}) =>
+final _registry = testCustomColumns;
+
+MergedItem _item(int id,
+        {String? tag, int? qty, double? cost, bool? wish, DateTime? when}) =>
     MergedItem(
       id: id,
       importedId: '$id',
@@ -34,11 +27,11 @@ List<int> _order(List<MergedItem> items) => [for (final i in items) i.id];
 
 void main() {
   test('custom id is prefixed and resolves through the registry', () {
-    expect(customId('qty'), 'cf.qty');
-    expect(customColumnFor('cf.qty', _registry)?.name, 'qty');
+    expect(customId('testInteger'), 'cf.testInteger');
+    expect(customColumnFor('cf.testInteger', _registry)?.name, 'testInteger');
     expect(customColumnFor('cf.gone', _registry), isNull);
-    expect(customColumnFor('qty', _registry), isNull);
-    expect(sortKeyLabel('cf.cost', _registry), 'cost');
+    expect(customColumnFor('testInteger', _registry), isNull);
+    expect(sortKeyLabel('cf.testReal', _registry), 'testReal');
     expect(sortKeyLabel('cf.gone', _registry), 'cf.gone');
     expect(sortKeyLabel('bogus', _registry), 'bogus');
     expect(sortKeyLabel('value', _registry), 'Value');
@@ -47,26 +40,31 @@ void main() {
   test('column and sort id lists: built-ins first, dates sortable (f)', () {
     final cols = columnIdsFor(_registry);
     expect(cols.sublist(0, sortKeyIds.length), sortKeyIds);
-    expect(cols.sublist(sortKeyIds.length).first, 'cf.tag');
-    expect(cols, contains('cf.when'));
-    expect(sortableIdsFor(_registry), contains('cf.when'));
-    expect(sortableIdsFor(_registry), contains('cf.wish'));
+    expect(cols.sublist(sortKeyIds.length).first, 'cf.testText');
+    expect(cols, contains('cf.testDate'));
+    expect(sortableIdsFor(_registry), contains('cf.testDate'));
+    expect(sortableIdsFor(_registry), contains('cf.testBool'));
   });
 
   test('cell text per type; date is the calendar date only', () {
     final i = _item(1,
-        tag: 'x', qty: 3, cost: 2.5, wish: false, when: DateTime(2026, 3, 7, 23, 59));
+        tag: 'x',
+        qty: 3,
+        cost: 2.5,
+        wish: false,
+        when: DateTime(2026, 3, 7, 23, 59));
     String? t(String n) => cellText(i, customId(n), registry: _registry);
-    expect(t('tag'), 'x');
-    expect(t('qty'), '3');
-    expect(t('cost'), '2.5');
-    expect(t('wish'), 'No');
-    expect(t('when'), '2026-03-07');
-    expect(t('grade'), isNull);
+    expect(t('testText'), 'x');
+    expect(t('testInteger'), '3');
+    expect(t('testReal'), '2.5');
+    expect(t('testBool'), 'No');
+    expect(t('testDate'), '2026-03-07');
+    expect(t('testChoice'), isNull);
     expect(cellText(i, 'cf.gone', registry: _registry), isNull);
   });
 
-  test('sort: text case-insensitive, numeric, bool false first, nulls last', () {
+  test('sort: text case-insensitive, numeric, bool false first, nulls last',
+      () {
     final items = [
       _item(1, tag: 'b', qty: 10, wish: true),
       _item(2, tag: 'A', qty: 9, wish: false),
@@ -75,16 +73,19 @@ void main() {
     ];
     List<int> s(String k, bool asc) =>
         _order(sortItems(items, customId(k), asc, registry: _registry));
-    expect(s('tag', true), [2, 1, 4, 3]);
-    expect(s('tag', false), [4, 1, 2, 3]);
-    expect(s('qty', true), [2, 1, 4, 3]);
-    expect(s('qty', false), [4, 1, 2, 3]);
-    expect(s('wish', true), [2, 4, 1, 3]);
-    expect(s('wish', false), [1, 2, 4, 3]);
+    expect(s('testText', true), [2, 1, 4, 3]);
+    expect(s('testText', false), [4, 1, 2, 3]);
+    expect(s('testInteger', true), [2, 1, 4, 3]);
+    expect(s('testInteger', false), [4, 1, 2, 3]);
+    expect(s('testBool', true), [2, 4, 1, 3]);
+    expect(s('testBool', false), [1, 2, 4, 3]);
   });
 
   test('sort: removed and unknown keys leave the order unchanged', () {
-    final items = [_item(2, when: DateTime(2026)), _item(1, when: DateTime(2025))];
+    final items = [
+      _item(2, when: DateTime(2026)),
+      _item(1, when: DateTime(2025))
+    ];
     for (final k in ['cf.gone', 'bogus']) {
       expect(_order(sortItems(items, k, true, registry: _registry)), [2, 1]);
     }
@@ -92,12 +93,16 @@ void main() {
 
   test('parseColumnIds keeps declared custom ids and skips removed ones', () {
     expect(
-      parseColumnIds('["name","cf.qty","cf.gone","bogus","cf.qty"]', ['value'],
+      parseColumnIds(
+          '["name","cf.testInteger","cf.gone","bogus","cf.testInteger"]',
+          ['value'],
           registry: _registry),
-      ['name', 'cf.qty'],
+      ['name', 'cf.testInteger'],
     );
-    expect(parseColumnIds('["cf.gone"]', ['value'], registry: _registry), ['value']);
-    expect(parseColumnIds('["cf.qty"]', ['value'], registry: const []), ['value']);
+    expect(parseColumnIds('["cf.gone"]', ['value'], registry: _registry),
+        ['value']);
+    expect(parseColumnIds('["cf.testInteger"]', ['value'], registry: const []),
+        ['value']);
   });
 
   // REQ-045 (iv): mounts a strip over stored prefs; returns what it reported.
@@ -128,21 +133,25 @@ void main() {
     return (sorts: sorts, cols: cols);
   }
 
-  testWidgets('REQ-045 (iv): a stored custom column and sort key are restored on mount', (
+  testWidgets(
+      'REQ-045 (iv): a stored custom column and sort key are restored on mount',
+      (
     tester,
   ) async {
     final r = await mountStrip(tester, {
-      't_sort_key': 'cf.qty',
+      't_sort_key': 'cf.testInteger',
       't_sort_asc': false,
-      't_columns': '["name","cf.qty"]',
+      't_columns': '["name","cf.testInteger"]',
     });
-    expect(r.sorts, [('cf.qty', false)]);
+    expect(r.sorts, [('cf.testInteger', false)]);
     expect(r.cols, [
-      ['name', 'cf.qty'],
+      ['name', 'cf.testInteger'],
     ]);
   });
 
-  testWidgets('REQ-045 (iv): a stored removed custom sort id keeps the host initial value', (
+  testWidgets(
+      'REQ-045 (iv): a stored removed custom sort id keeps the host initial value',
+      (
     tester,
   ) async {
     final r = await mountStrip(tester, {
@@ -152,7 +161,8 @@ void main() {
     expect(r.sorts, isEmpty);
   });
 
-  testWidgets('choosing a custom column shows its label: value cell', (tester) async {
+  testWidgets('choosing a custom column shows its label: value cell',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     // Tall surface so every dialog row, custom ones last, is on screen.
     tester.view.physicalSize = const Size(800, 3000);
@@ -182,12 +192,12 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    expect(find.text('qty: 7'), findsNothing);
+    expect(find.text('testInteger: 7'), findsNothing);
     await tester.tap(find.byKey(const Key('columns-button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CheckboxListTile, 'qty'));
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'testInteger'));
     await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
-    expect(find.text('qty: 7'), findsOneWidget);
+    expect(find.text('testInteger: 7'), findsOneWidget);
   });
 }

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/database/database.dart';
-import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/widgets/search_filter_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -43,7 +42,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('REQ-037: saving a preset then reloading a fresh instance shows it in the dropdown',
+  testWidgets(
+      'REQ-037: saving a preset then reloading a fresh instance shows it in the dropdown',
       (WidgetTester tester) async {
     await pump(tester);
 
@@ -65,7 +65,8 @@ void main() {
     await disposeAndFlush(tester);
   });
 
-  testWidgets('REQ-037: applying a preset restores its search term into the live state',
+  testWidgets(
+      'REQ-037: applying a preset restores its search term into the live state',
       (WidgetTester tester) async {
     await pump(tester);
 
@@ -88,7 +89,8 @@ void main() {
     await disposeAndFlush(tester);
   });
 
-  testWidgets('REQ-037: saving under an existing name replaces it, not duplicates it',
+  testWidgets(
+      'REQ-037: saving under an existing name replaces it, not duplicates it',
       (WidgetTester tester) async {
     await pump(tester);
 
@@ -189,11 +191,6 @@ void main() {
     await disposeAndFlush(tester);
   });
 
-  // REQ-045 (v): a registry with one declared custom text field, `tag`.
-  final tagRegistry = <CustomColumn>[
-    (id: null, name: 'tag', type: CustomColumnType.text, value: (r) => r.tag, column: (t) => t.serialNo),
-  ];
-
   Future<void> pumpTagged(WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -202,7 +199,7 @@ void main() {
             prefsKeyPrefix: 'test',
             items: items,
             onFiltered: (_) {},
-            registry: tagRegistry,
+            registry: testCustomColumns,
           ),
         ),
       ),
@@ -213,7 +210,8 @@ void main() {
   Map<String, String> clause(String field, String op, String value) =>
       {'field': field, 'op': op, 'value': value};
 
-  testWidgets('REQ-045 (v): bad stored clauses and presets are skipped, the rest still load',
+  testWidgets(
+      'REQ-045 (v): bad stored clauses and presets are skipped, the rest still load',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
       'test_clauses': jsonEncode([
@@ -221,7 +219,7 @@ void main() {
         clause('bogus', 'equal', 'b'), // unknown built-in name
         clause('rarity', 'nope', 'c'), // unknown operator
         clause('rarity', 'equal', 'Holo'),
-        clause('cf.tag', 'notEqual', 'x'),
+        clause('cf.testText', 'notEqual', 'x'),
       ]),
       'test_presets': jsonEncode([
         {
@@ -232,7 +230,7 @@ void main() {
         {
           'name': 'Good',
           'searchTerm': 'zz',
-          'clauses': [clause('cf.tag', 'equal', 'x')],
+          'clauses': [clause('cf.testText', 'equal', 'x')],
         },
       ]),
     });
@@ -241,7 +239,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(InputChip), findsNWidgets(2));
     expect(find.textContaining('Holo'), findsOneWidget);
-    expect(find.text('tag != x'), findsOneWidget);
+    expect(find.text('testText != x'), findsOneWidget);
     expect(find.textContaining('gone'), findsNothing);
 
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -255,10 +253,10 @@ void main() {
   testWidgets('REQ-045 (v): a preset holding a custom clause saves and reloads',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({
-      'test_clauses': jsonEncode([clause('cf.tag', 'equal', 'x')]),
+      'test_clauses': jsonEncode([clause('cf.testText', 'equal', 'x')]),
     });
     await pumpTagged(tester);
-    expect(find.text('tag = x'), findsOneWidget);
+    expect(find.text('testText = x'), findsOneWidget);
     await saveAs(tester, 'Mine');
     await disposeAndFlush(tester);
 
@@ -272,7 +270,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mine').last);
     await tester.pumpAndSettle();
-    expect(find.text('tag = x'), findsOneWidget);
+    expect(find.text('testText = x'), findsOneWidget);
 
     await disposeAndFlush(tester);
   });

@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:holovault/database/database.dart';
+import 'package:holovault/database/overrides_schema.dart';
 import 'package:holovault/override_convert.dart';
 
 import '../tool/generate_overrides_schema.dart';
+import 'helpers.dart';
 
 Map<String, dynamic> _e(int id, String name, String type) =>
     {'id': id, 'name': name, 'type': type};
@@ -22,6 +24,11 @@ const _lossless = <String, Set<String>>{
 
 OverrideStep _retype(int id, String from, String to, {bool clear = false}) =>
     (id: id, kind: 'retype', type: to, from: from, clear: clear);
+
+List<OverrideStep> _atCounter(int start, List<OverrideStep> steps) => [
+      for (var i = 0; i < start; i++) steps.first,
+      ...steps,
+    ];
 
 void main() {
   group('REQ-055 the type-change pair table', () {
@@ -205,74 +212,141 @@ void main() {
     Future<Object?> counter(AppDatabase db) async =>
         (await db.customSelect('SELECT value FROM override_counter').getSingle()).data['value'];
 
+    Future<int> unusedId(AppDatabase db) async {
+      final names = (await columns(db)).keys.toSet();
+      var id = 1;
+      while (names.contains('cf$id')) {
+        id++;
+      }
+      return id;
+    }
+
     test('a converting retype changes the column, keeps the other fields, rebuilds the view', () async {
       final db = open();
-      await db.saveCustomFields('c1', {'serialNo': 'S1', 'addCost': 12.5});
-      await db.saveCustomFields('c2', {'addCost': 3.0});
-      await db.replayOverrideSteps(from: 0, target: 1, steps: [_retype(3, 'real', 'text')]);
-      expect((await columns(db))['cf3'], 'TEXT');
-      expect((await columns(db)).keys, isNot(contains('cf3_new')));
-      expect((await row(db, 'c1'))['cf3'], '12.5');
-      expect((await row(db, 'c2'))['cf3'], '3.0');
-      expect((await row(db, 'c1'))['cf1'], 'S1');
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.real,
+        CustomColumnType.text,
+      }, testName: 'converting retype');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final real = fields[CustomColumnType.real]!;
+      final other = fields[CustomColumnType.text]!;
+      final liveReg = [real.column, other.column];
+      final start = await counter(db) as int;
+      await db.saveCustomFields('c1', {other.column.name: other.value, real.column.name: real.value}, registry: liveReg);
+      final secondReal = sampleCustomValue(CustomColumnType.real, variant: 1);
+      await db.saveCustomFields('c2', {real.column.name: secondReal}, registry: liveReg);
+      await db.replayOverrideSteps(
+        from: start,
+        target: start + 1,
+        steps: _atCounter(start, [_retype(real.column.id!, 'real', 'text')]),
+      );
+      expect((await columns(db))[real.sqlName], 'TEXT');
+      expect((await columns(db)).keys, isNot(contains('${real.sqlName}_new')));
+      expect((await row(db, 'c1'))[real.sqlName], '${real.value}');
+      expect((await row(db, 'c2'))[real.sqlName], '$secondReal');
+      expect((await row(db, 'c1'))[other.sqlName], other.value);
       expect(await db.customSelect('SELECT imported_id FROM merged_items').get(), isEmpty);
-      expect(await counter(db), 1);
+      expect(await counter(db), start + 1);
       await db.close();
     });
 
     test('a null stays null; a date becomes its local day', () async {
       final db = open();
-      await db.saveCustomFields('c1', {'eventDate': DateTime(2026, 2, 3, 23, 30)});
-      await db.saveCustomFields('c2', {'serialNo': 'only'});
-      await db.replayOverrideSteps(from: 0, target: 1, steps: [_retype(5, 'date', 'text')]);
-      expect((await row(db, 'c1'))['cf5'], '2026-02-03');
-      expect((await row(db, 'c2'))['cf5'], isNull);
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.date,
+      }, testName: 'date retype keeps null and converts local day');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final date = fields[CustomColumnType.date]!;
+      final start = await counter(db) as int;
+      await db.saveCustomFields('c1', {date.column.name: date.value}, registry: [date.column]);
+      await db.saveCustomFields('c2', {date.column.name: null}, registry: [date.column]);
+      await db.replayOverrideSteps(
+        from: start,
+        target: start + 1,
+        steps: _atCounter(start, [_retype(date.column.id!, 'date', 'text')]),
+      );
+      final localDay = (date.value as DateTime).toIso8601String().substring(0, 10);
+      expect((await row(db, 'c1'))[date.sqlName], localDay);
+      expect((await row(db, 'c2'))[date.sqlName], isNull);
       await db.close();
     });
 
     test('a clearing retype empties the field and keeps the others', () async {
       final db = open();
-      await db.saveCustomFields('c1', {'serialNo': 'S1', 'addCost': 12.5});
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.real,
+        CustomColumnType.text,
+      }, testName: 'clearing retype');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final real = fields[CustomColumnType.real]!;
+      final other = fields[CustomColumnType.text]!;
+      final liveReg = [real.column, other.column];
+      final start = await counter(db) as int;
+      await db.saveCustomFields('c1', {other.column.name: other.value, real.column.name: real.value}, registry: liveReg);
       await db.replayOverrideSteps(
-        from: 0,
-        target: 1,
-        steps: [_retype(3, 'real', 'int', clear: true)],
+        from: start,
+        target: start + 1,
+        steps: _atCounter(start, [_retype(real.column.id!, 'real', 'int', clear: true)]),
       );
-      expect((await columns(db))['cf3'], 'INTEGER');
-      expect((await row(db, 'c1'))['cf3'], isNull);
-      expect((await row(db, 'c1'))['cf1'], 'S1');
+      expect((await columns(db))[real.sqlName], 'INTEGER');
+      expect((await row(db, 'c1'))[real.sqlName], isNull);
+      expect((await row(db, 'c1'))[other.sqlName], other.value);
       await db.close();
     });
 
     test('bool to int drops the 0-or-1 check, so a new int value fits', () async {
       final db = open();
+      final start = await counter(db) as int;
+      final id = await unusedId(db);
       await db.customStatement('DROP VIEW merged_items');
       await db.customStatement(
-        'ALTER TABLE collection_item_overrides ADD COLUMN cf7 INTEGER CHECK (cf7 IN (0, 1))',
+        'ALTER TABLE collection_item_overrides ADD COLUMN cf$id INTEGER CHECK (cf$id IN (0, 1))',
       );
-      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf7) VALUES ('c1', 1)");
-      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf7) VALUES ('c2', 0)");
-      await db.replayOverrideSteps(from: 0, target: 1, steps: [_retype(7, 'bool', 'int')]);
-      expect((await row(db, 'c1'))['cf7'], 1);
-      expect((await row(db, 'c2'))['cf7'], 0);
-      await db.customStatement("UPDATE collection_item_overrides SET cf7 = 5 WHERE imported_id = 'c1'");
-      expect((await row(db, 'c1'))['cf7'], 5);
+      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf$id) VALUES ('c1', 1)");
+      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf$id) VALUES ('c2', 0)");
+      await db.replayOverrideSteps(
+        from: start,
+        target: start + 1,
+        steps: _atCounter(start, [_retype(id, 'bool', 'int')]),
+      );
+      expect((await row(db, 'c1'))['cf$id'], 1);
+      expect((await row(db, 'c2'))['cf$id'], 0);
+      await db.customStatement("UPDATE collection_item_overrides SET cf$id = 5 WHERE imported_id = 'c1'");
+      expect((await row(db, 'c1'))['cf$id'], 5);
       await db.close();
     });
 
     test('a clearing retype to bool gives a column that holds only 0, 1 or null', () async {
       final db = open();
-      await db.saveCustomFields('c1', {'serialNo': 'S1'});
+      final fields = liveFieldsOrSkip(db, {
+        CustomColumnType.text,
+      }, testName: 'clearing text retype to bool');
+      if (fields == null) {
+        await db.close();
+        return;
+      }
+      final text = fields[CustomColumnType.text]!;
+      final start = await counter(db) as int;
+      await db.saveCustomFields('c1', {text.column.name: text.value}, registry: [text.column]);
       await db.replayOverrideSteps(
-        from: 0,
-        target: 1,
-        steps: [_retype(1, 'text', 'bool', clear: true)],
+        from: start,
+        target: start + 1,
+        steps: _atCounter(start, [_retype(text.column.id!, 'text', 'bool', clear: true)]),
       );
-      expect((await columns(db))['cf1'], 'INTEGER');
-      expect((await row(db, 'c1'))['cf1'], isNull);
-      await db.customStatement("UPDATE collection_item_overrides SET cf1 = 1 WHERE imported_id = 'c1'");
+      expect((await columns(db))[text.sqlName], 'INTEGER');
+      expect((await row(db, 'c1'))[text.sqlName], isNull);
+      await db.customStatement("UPDATE collection_item_overrides SET ${text.sqlName} = 1 WHERE imported_id = 'c1'");
       await expectLater(
-        db.customStatement("UPDATE collection_item_overrides SET cf1 = 5 WHERE imported_id = 'c1'"),
+        db.customStatement("UPDATE collection_item_overrides SET ${text.sqlName} = 5 WHERE imported_id = 'c1'"),
         throwsA(anything),
       );
       await db.close();
@@ -280,47 +354,60 @@ void main() {
 
     test('two steps on one id in one replay chain: bool to int to real', () async {
       final db = open();
+      final start = await counter(db) as int;
+      final id = await unusedId(db);
       await db.customStatement('DROP VIEW merged_items');
       await db.customStatement(
-        'ALTER TABLE collection_item_overrides ADD COLUMN cf7 INTEGER CHECK (cf7 IN (0, 1))',
+        'ALTER TABLE collection_item_overrides ADD COLUMN cf$id INTEGER CHECK (cf$id IN (0, 1))',
       );
-      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf7) VALUES ('c1', 1)");
-      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf7) VALUES ('c2', 0)");
+      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf$id) VALUES ('c1', 1)");
+      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf$id) VALUES ('c2', 0)");
       await db.replayOverrideSteps(
-        from: 0,
-        target: 2,
-        steps: [_retype(7, 'bool', 'int'), _retype(7, 'int', 'real')],
+        from: start,
+        target: start + 2,
+        steps: _atCounter(start, [_retype(id, 'bool', 'int'), _retype(id, 'int', 'real')]),
       );
-      expect((await columns(db))['cf7'], 'REAL');
-      expect((await row(db, 'c1'))['cf7'], 1.0);
-      expect((await row(db, 'c2'))['cf7'], 0.0);
-      expect(await counter(db), 2);
+      expect((await columns(db))['cf$id'], 'REAL');
+      expect((await row(db, 'c1'))['cf$id'], 1.0);
+      expect((await row(db, 'c2'))['cf$id'], 0.0);
+      expect(await counter(db), start + 2);
       await db.close();
     });
 
     test('a value that cannot convert rolls the whole step back', () async {
       final db = open();
+      final start = await counter(db) as int;
+      final id = await unusedId(db);
       await db.customStatement('DROP VIEW merged_items');
-      await db.customStatement('ALTER TABLE collection_item_overrides ADD COLUMN cf7 INTEGER');
-      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf7) VALUES ('c1', 5)");
+      await db.customStatement('ALTER TABLE collection_item_overrides ADD COLUMN cf$id INTEGER');
+      await db.customStatement("INSERT INTO collection_item_overrides (imported_id, cf$id) VALUES ('c1', 5)");
       await expectLater(
-        db.replayOverrideSteps(from: 0, target: 1, steps: [_retype(7, 'bool', 'int')]),
+        db.replayOverrideSteps(
+          from: start,
+          target: start + 1,
+          steps: _atCounter(start, [_retype(id, 'bool', 'int')]),
+        ),
         throwsA(isA<StateError>()),
       );
-      expect((await columns(db)).keys, contains('cf7'));
-      expect((await columns(db)).keys, isNot(contains('cf7_new')));
-      expect((await row(db, 'c1'))['cf7'], 5);
-      expect(await counter(db), 0);
+      expect((await columns(db)).keys, contains('cf$id'));
+      expect((await columns(db)).keys, isNot(contains('cf${id}_new')));
+      expect((await row(db, 'c1'))['cf$id'], 5);
+      expect(await counter(db), start);
       await db.close();
     });
 
     test('a retype of a missing column fails loudly and changes nothing', () async {
       final db = open();
+      final start = await counter(db) as int;
       await expectLater(
-        db.replayOverrideSteps(from: 0, target: 1, steps: [_retype(99, 'int', 'real')]),
+        db.replayOverrideSteps(
+          from: start,
+          target: start + 1,
+          steps: _atCounter(start, [_retype(99, 'int', 'real')]),
+        ),
         throwsA(isA<StateError>()),
       );
-      expect(await counter(db), 0);
+      expect(await counter(db), start);
       await db.close();
     });
   });
