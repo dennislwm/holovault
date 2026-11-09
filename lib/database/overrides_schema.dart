@@ -7,11 +7,13 @@ import 'database.dart';
 class CollectionItemOverrides extends Table {
   TextColumn get importedId => text().unique()();
   TextColumn get serialNo => text().named('cf1').nullable()();
-  TextColumn get preGrade => text().named('cf2').nullable()();
+  TextColumn get comment => text().named('cf2').nullable()();
   RealColumn get addCost => real().named('cf3').nullable()();
   RealColumn get releasePrice => real().named('cf4').nullable()();
   DateTimeColumn get eventDate => dateTime().named('cf5').nullable()();
   TextColumn get eventName => text().named('cf6').nullable()();
+  RealColumn get soldPrice => real().named('cf7').nullable()();
+  IntColumn get refId => integer().named('cf8').nullable()();
 }
 
 abstract class MergedItems extends View {
@@ -45,11 +47,13 @@ abstract class MergedItems extends View {
     collectionItems.dateAdded,
     collectionItems.tag,
     collectionItemOverrides.serialNo,
-    collectionItemOverrides.preGrade,
+    collectionItemOverrides.comment,
     collectionItemOverrides.addCost,
     collectionItemOverrides.releasePrice,
     collectionItemOverrides.eventDate,
     collectionItemOverrides.eventName,
+    collectionItemOverrides.soldPrice,
+    collectionItemOverrides.refId,
   ]).from(collectionItems).join([
     leftOuterJoin(
       collectionItemOverrides,
@@ -70,28 +74,34 @@ typedef CustomColumn = ({int? id, String name, CustomColumnType type, Object? Fu
 // REQ-055: the counter and its ordered steps come from overrides_snapshot.json;
 // step N is counter N. The app replays the steps between its stored
 // counter and this one.
-const overrideCounter = 0;
+const overrideCounter = 2;
 
 const overrideSteps = <({int id, String kind, String type, String from, bool clear})>[
+  (id: 7, kind: 'add', type: 'real', from: '', clear: false),
+  (id: 8, kind: 'add', type: 'int', from: '', clear: false),
 ];
 
 /// The overrides-table column of config id [id], live or removed; null if none.
 GeneratedColumn? overrideColumn($CollectionItemOverridesTable t, int id) =>
     switch (id) {
       1 => t.serialNo,
-      2 => t.preGrade,
+      2 => t.comment,
       3 => t.addCost,
       4 => t.releasePrice,
       5 => t.eventDate,
       6 => t.eventName,
+      7 => t.soldPrice,
+      8 => t.refId,
       _ => null,
     };
 
 final customColumns = <CustomColumn>[
   (id: 1, name: 'serialNo', type: CustomColumnType.text, value: (r) => r.serialNo, column: (t) => t.serialNo),
-  (id: 2, name: 'preGrade', type: CustomColumnType.choice, value: (r) => r.preGrade, column: (t) => t.preGrade),
+  (id: 2, name: 'comment', type: CustomColumnType.text, value: (r) => r.comment, column: (t) => t.comment),
   (id: 3, name: 'addCost', type: CustomColumnType.real, value: (r) => r.addCost, column: (t) => t.addCost),
   (id: 4, name: 'releasePrice', type: CustomColumnType.real, value: (r) => r.releasePrice, column: (t) => t.releasePrice),
   (id: 5, name: 'eventDate', type: CustomColumnType.date, value: (r) => r.eventDate, column: (t) => t.eventDate),
   (id: 6, name: 'eventName', type: CustomColumnType.choice, value: (r) => r.eventName, column: (t) => t.eventName),
+  (id: 7, name: 'soldPrice', type: CustomColumnType.real, value: (r) => r.soldPrice, column: (t) => t.soldPrice),
+  (id: 8, name: 'refId', type: CustomColumnType.int, value: (r) => r.refId, column: (t) => t.refId),
 ];

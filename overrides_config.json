@@ -1,10 +1,12 @@
 {
   "extraColumns": [
     { "id": 1, "name": "serialNo", "type": "text" },
-    { "id": 2, "name": "preGrade", "type": "choice" },
+    { "id": 2, "name": "comment", "type": "text" },
     { "id": 3, "name": "addCost", "type": "real" },
     { "id": 4, "name": "releasePrice", "type": "real" },
     { "id": 5, "name": "eventDate", "type": "date" },
-    { "id": 6, "name": "eventName", "type": "choice" }
+    { "id": 6, "name": "eventName", "type": "choice" },
+    { "id": 7, "name": "soldPrice", "type": "real" },
+    { "id": 8, "name": "refId", "type": "int" }
   ]
 }

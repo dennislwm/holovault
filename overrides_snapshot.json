@@ -1,13 +1,13 @@
 {
-  "counter": 0,
+  "counter": 2,
   "columns": {
     "1": {
       "name": "serialNo",
       "type": "text"
     },
     "2": {
-      "name": "preGrade",
-      "type": "choice"
+      "name": "comment",
+      "type": "text"
     },
     "3": {
       "name": "addCost",
@@ -24,8 +24,27 @@
     "6": {
       "name": "eventName",
       "type": "choice"
+    },
+    "7": {
+      "name": "soldPrice",
+      "type": "real"
+    },
+    "8": {
+      "name": "refId",
+      "type": "int"
     }
   },
   "removed": {},
-  "steps": []
+  "steps": [
+    {
+      "id": 7,
+      "kind": "add",
+      "type": "real"
+    },
+    {
+      "id": 8,
+      "kind": "add",
+      "type": "int"
+    }
+  ]
 }
