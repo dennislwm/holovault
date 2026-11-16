@@ -167,6 +167,26 @@ void main() {
     },
   );
 
+  testWidgets(
+      'REQ-056: the clear button shows only with text and empties the box and the stored term',
+      (WidgetTester tester) async {
+    await pump(tester);
+    expect(find.byTooltip('Clear search'), findsNothing);
+
+    await tester.enterText(find.byType(TextField).first, 'char');
+    await tester.pump();
+    expect(find.byTooltip('Clear search'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Clear search'));
+    await tester.pumpAndSettle();
+    expect(find.text('char'), findsNothing);
+    expect(find.byTooltip('Clear search'), findsNothing);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('test_search'), '');
+
+    await disposeAndFlush(tester);
+  });
+
   testWidgets('REQ-039: cancelling the delete confirmation keeps the preset',
       (WidgetTester tester) async {
     await pump(tester);

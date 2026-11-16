@@ -210,6 +210,12 @@ class SearchFilterBarState extends State<SearchFilterBar> {
     widget.onFiltered(result);
   }
 
+  void _onSearchChanged(String value) {
+    _searchTerm = value;
+    _recompute();
+    _persist();
+  }
+
   void _addClause(SearchClause clause) {
     setState(() => _clauses.add(clause));
     _recompute();
@@ -233,19 +239,29 @@ class SearchFilterBarState extends State<SearchFilterBar> {
           child: Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Search',
-                    isDense: true,
-                    border: OutlineInputBorder(),
+                // REQ-056: the clear (x) button shows only while the box has text.
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _searchController,
+                  builder: (context, value, _) => TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: value.text.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.clear),
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                _searchController.clear();
+                                _onSearchChanged('');
+                              },
+                            ),
+                      hintText: 'Search',
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: _onSearchChanged,
                   ),
-                  onChanged: (value) {
-                    _searchTerm = value;
-                    _recompute();
-                    _persist();
-                  },
                 ),
               ),
               IconButton(
